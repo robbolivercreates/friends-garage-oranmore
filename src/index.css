@@ -1,0 +1,290 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Brand palette — Friends Garage "Precision Atelier" */
+  --color-ink-950: #0A0B0E;
+  --color-ink-900: #101216;
+  --color-ink-850: #14161B;
+  --color-ink-800: #1A1D23;
+  --color-ink-700: #242832;
+  --color-ink-600: #2F333A;
+  --color-ink-400: #5A606C;
+  --color-ink-300: #8B919C;
+  --color-ink-200: #B9BEC7;
+
+  --color-brand-400: #F0326F;
+  --color-brand-500: #D5004F;
+  --color-brand-600: #B80043;
+  --color-brand-700: #940037;
+
+  --color-paper: #F6F6F3;
+  --color-paper-dark: #ECECE7;
+
+  --font-display: 'Sora', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-body);
+    color: var(--color-ink-950);
+    background-color: var(--color-paper);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+  }
+
+  ::selection {
+    background: var(--color-brand-500);
+    color: #fff;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Shared premium utilities — use these everywhere for consistency    */
+/* ------------------------------------------------------------------ */
+
+/* Eyebrow label: small caps tag with accent dash */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-brand-500);
+}
+.eyebrow::before {
+  content: '';
+  display: block;
+  width: 1.75rem;
+  height: 2px;
+  background: var(--color-brand-500);
+}
+.eyebrow--plain::before {
+  display: none;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  border-radius: 0.875rem;
+  padding: 0.875rem 1.5rem;
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* NOTE: variants must be combined with the base class, e.g. className="btn btn-primary" */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-brand-500), var(--color-brand-600));
+  color: #fff;
+  box-shadow: 0 6px 20px -6px rgba(213, 0, 79, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px -8px rgba(213, 0, 79, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-dark {
+  background: var(--color-ink-950);
+  color: #fff;
+  box-shadow: 0 6px 18px -8px rgba(10, 11, 14, 0.6);
+}
+.btn-dark:hover {
+  background: var(--color-ink-700);
+  transform: translateY(-2px);
+}
+
+.btn-outline-light {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+}
+.btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+}
+
+.btn-outline-dark {
+  background: transparent;
+  color: var(--color-ink-950);
+  border: 1px solid rgba(10, 11, 14, 0.2);
+}
+.btn-outline-dark:hover {
+  border-color: var(--color-ink-950);
+  background: rgba(10, 11, 14, 0.04);
+  transform: translateY(-2px);
+}
+
+/* Form fields */
+.input {
+  width: 100%;
+  background: #fff;
+  border: 1px solid rgba(10, 11, 14, 0.14);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--color-ink-950);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input::placeholder {
+  color: var(--color-ink-300);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--color-brand-500);
+  box-shadow: 0 0 0 3px rgba(213, 0, 79, 0.12);
+}
+
+.input-dark {
+  width: 100%;
+  background: rgba(10, 11, 14, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input-dark::placeholder {
+  color: var(--color-ink-300);
+}
+.input-dark:focus {
+  outline: none;
+  border-color: var(--color-brand-500);
+  box-shadow: 0 0 0 3px rgba(213, 0, 79, 0.2);
+}
+
+.label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-ink-700);
+  margin-bottom: 0.375rem;
+}
+.label-dark {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-ink-200);
+  margin-bottom: 0.375rem;
+}
+
+/* Cards */
+.card-light {
+  background: #fff;
+  border: 1px solid rgba(10, 11, 14, 0.08);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 2px rgba(10, 11, 14, 0.04), 0 12px 32px -16px rgba(10, 11, 14, 0.12);
+}
+
+.card-dark {
+  background: linear-gradient(160deg, var(--color-ink-800), var(--color-ink-900));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.25rem;
+  box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.6);
+}
+
+/* Subtle film grain overlay for dark hero sections */
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Radial brand glow accent, absolutely positioned */
+.glow-brand {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(213, 0, 79, 0.22) 0%, transparent 65%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Keyframe animations                                                */
+/* ------------------------------------------------------------------ */
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes kenburns {
+  from { transform: scale(1.0); }
+  to { transform: scale(1.12); }
+}
+.animate-kenburns {
+  animation: kenburns 18s ease-out forwards;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5); }
+  50% { opacity: 0.75; box-shadow: 0 0 0 5px rgba(52, 211, 153, 0); }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-ink-950);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 6px;
+  border: 2px solid var(--color-ink-950);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-500);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
