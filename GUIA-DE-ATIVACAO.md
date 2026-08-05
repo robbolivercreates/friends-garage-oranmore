@@ -1,5 +1,46 @@
 # Friends Garage — Guia de Ativação (para a cliente)
 
+## Como vai ficar quando estiver no ar — o quadro completo
+
+**O que os clientes veem:**
+- Site no ar em `friendsgarage.ie` (ou o domínio escolhido), com vídeo da
+  oficina na página inicial, fotos reais da equipe e do espaço
+- Agendamento online em 5 passos — o cliente escolhe serviço, placa, data e
+  horário (o sistema só mostra vagas reais: domingo, feriados e horários
+  ocupados são bloqueados automaticamente)
+- Pedido de orçamento, pedido de "me ligue de volta" e página de emergência
+  na estrada
+- O cliente recebe e-mail na hora (pedido recebido) e outro quando a equipe
+  confirma — com convite de calendário anexado
+
+**O que a equipe recebe e faz:**
+- E-mail instantâneo para a oficina a cada novo pedido (agendamento,
+  orçamento, callback ou emergência 🚨) — com convite de calendário para
+  adicionar ao Google Calendar com um toque
+- **Painel da equipe** (link "Staff Login" no rodapé do site): é a agenda da
+  oficina. Nele a equipe:
+  - Confirma, remarca, conclui ou cancela agendamentos — **tudo pode ser
+    desfeito**: o seletor de status permite voltar atrás em qualquer ação, e
+    "Reschedule" move data/horário livremente. O cliente é avisado por
+    e-mail automaticamente a cada mudança
+  - Tem botão de **WhatsApp** pronto em cada pedido (abre conversa com
+    mensagem pré-escrita)
+  - Bloqueia feriados e dias de fechamento (aba Blocked Dates)
+  - Ajusta horários, telefones e capacidade diária (aba Site Settings)
+  - Exporta tudo em CSV (Excel)
+  - Adiciona notas internas por agendamento
+- Nenhuma ação exige conhecimento técnico.
+
+**O que acontece sozinho (sem ninguém tocar):**
+- Bloqueio de horários ocupados, domingos e feriados
+- E-mails de confirmação/remarcação/cancelamento para o cliente
+- Números de referência de cada pedido (FG-2026-XXXX)
+- Registro de tudo no banco de dados (SQLite, com backup simples)
+
+**O que falta para ligar (só a cliente pode fazer):** ver passos 1 a 4 abaixo.
+
+---
+
 Este guia explica, em linguagem simples, o que a oficina precisa fazer para
 colocar o site 100% no ar. Nada aqui exige conhecimento técnico — são apenas
 criações de conta. Qualquer dúvida, fale com o desenvolvedor.

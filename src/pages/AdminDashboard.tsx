@@ -75,6 +75,15 @@ const waLink = (phone: string, message: string): string => {
 const waBtn =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors cursor-pointer';
 
+/** Same workshop time slots offered on the public booking form. */
+const TIME_SLOTS = [
+  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '12:30', '14:00', '14:30', '15:00', '15:30',
+  '16:00', '16:30', '17:00'
+];
+
+const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'rescheduled', 'cancelled'];
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<TabId>('bookings');
   const [loading, setLoading] = useState(true);
@@ -97,6 +106,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   // Internal Notes Editing
   const [selectedBookingNotes, setSelectedBookingNotes] = useState<{ id: string; text: string } | null>(null);
+
+  // Reschedule editing (staff can freely move a booking to another day/time)
+  const [rescheduleEditing, setRescheduleEditing] = useState<{ id: string; date: string; time: string } | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -136,6 +148,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       });
       if (res.ok) {
         setBookings(prev => prev.map(b => b.id === id ? { ...b, status: status as any } : b));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  /** Status change with an undo-friendly guard: cancelling asks first. */
+  const handleStatusChange = (b: Booking, newStatus: string) => {
+    if (newStatus === b.status) return;
+    if (newStatus === 'cancelled') {
+      const ok = window.confirm(
+        `Cancel booking ${b.referenceNumber} for ${b.customerName}?\n\nThe customer will receive a cancellation email. You can undo this later by changing the status back.`
+      );
+      if (!ok) return;
+    }
+    handleUpdateBookingStatus(b.id, newStatus);
+  };
+
+  /** Move a booking to a new date/time (staff override — no slot restrictions). */
+  const handleReschedule = async () => {
+    if (!rescheduleEditing) return;
+    const { id, date, time } = rescheduleEditing;
+    if (!date || !time) return;
+    try {
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingDate: date, bookingTime: time, status: 'rescheduled' })
+      });
+      if (res.ok) {
+        setBookings(prev => prev.map(b => b.id === id ? { ...b, bookingDate: date, bookingTime: time, status: 'rescheduled' } : b));
+        setRescheduleEditing(null);
       }
     } catch (err) {
       console.error(err);
@@ -392,10 +436,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   <option value="pending">Pending</option>
                   <option value="confirmed">Confirmed</option>
                   <option value="completed">Completed</option>
+                  <option value="rescheduled">Rescheduled</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
               </div>
             </div>
+
+            <p className="text-xs text-ink-300 px-1">
+              Tip: every action can be undone — use the status dropdown on any booking to change it back, or "Reschedule" to move the date/time. The customer is emailed automatically on any change.
+            </p>
 
             {/* Bookings Table */}
             <div className="card-dark overflow-hidden">
@@ -427,8 +476,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                           </td>
 
                           <td className="p-4 sm:p-5 align-top">
-                            <span className="font-bold text-white block">{b.bookingDate}</span>
-                            <span className="text-ink-300">{b.bookingTime} ({b.durationMinutes}m)</span>
+                            {rescheduleEditing?.id === b.id ? (
+                              <div className="space-y-2 min-w-[160px]">
+                                <input
+                                  type="date"
+                                  value={rescheduleEditing.date}
+                                  onChange={(e) => setRescheduleEditing({ ...rescheduleEditing, date: e.target.value })}
+                                  className="input-dark !py-1.5 text-xs"
+                                />
+                                <select
+                                  value={rescheduleEditing.time}
+                                  onChange={(e) => setRescheduleEditing({ ...rescheduleEditing, time: e.target.value })}
+                                  className="input-dark !py-1.5 text-xs cursor-pointer"
+                                >
+                                  {TIME_SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <div className="flex gap-1.5">
+                                  <button
+                                    onClick={handleReschedule}
+                                    className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => setRescheduleEditing(null)}
+                                    className={ghostBtn}
+                                  >
+                                    Back
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-bold text-white block">{b.bookingDate}</span>
+                                <span className="text-ink-300">{b.bookingTime} ({b.durationMinutes}m)</span>
+                                <button
+                                  onClick={() => setRescheduleEditing({ id: b.id, date: b.bookingDate, time: b.bookingTime })}
+                                  className="block mt-1.5 text-xs font-semibold text-brand-400 hover:text-brand-500 underline underline-offset-2 transition-colors cursor-pointer"
+                                >
+                                  Reschedule
+                                </button>
+                              </>
+                            )}
                           </td>
 
                           <td className="p-4 sm:p-5 space-y-1 align-top">
@@ -487,30 +576,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
                             {b.status === 'pending' && (
                               <button
-                                onClick={() => handleUpdateBookingStatus(b.id, 'confirmed')}
+                                onClick={() => handleStatusChange(b, 'confirmed')}
                                 className={`${ghostBtn} text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 hover:text-emerald-300`}
                               >
                                 Confirm
                               </button>
                             )}
 
-                            {b.status !== 'completed' && b.status !== 'cancelled' && (
-                              <button
-                                onClick={() => handleUpdateBookingStatus(b.id, 'completed')}
-                                className={`${ghostBtn} text-sky-400 border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 hover:text-sky-300`}
-                              >
-                                Complete
-                              </button>
-                            )}
-
-                            {b.status !== 'cancelled' && (
-                              <button
-                                onClick={() => handleUpdateBookingStatus(b.id, 'cancelled')}
-                                className={`${ghostBtn} text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20 hover:text-red-300`}
-                              >
-                                Cancel
-                              </button>
-                            )}
+                            <select
+                              value={b.status}
+                              onChange={(e) => handleStatusChange(b, e.target.value)}
+                              title="Change status — you can always change it back"
+                              className="input-dark !py-1.5 !px-2.5 !text-xs cursor-pointer !w-auto inline-block"
+                            >
+                              {BOOKING_STATUSES.map(s => (
+                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                              ))}
+                            </select>
                           </td>
                         </tr>
                       ))
