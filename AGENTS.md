@@ -121,6 +121,10 @@ Reference numbers: `FG-2026-XXXX` bookings, `EST-`, `EMG-` (see
   `<source>` — both handlers are wired, keep both.
 - Dates are stored as `YYYY-MM-DD` strings; day-of-week checks must use
   `new Date(date + 'T00:00:00')` to avoid timezone shifts.
+- **Analytics**: `src/lib/analytics.ts` loads GTM (`VITE_GTM_ID`, build-time
+  env) only after cookie consent; the CookieBanner dispatches
+  `fg-consent-changed` on save. Meta Pixel goes inside the GTM container —
+  no code changes.
 
 ## Current delivery state
 

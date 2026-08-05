@@ -28,20 +28,26 @@ export const CookieBanner: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [showPreferencesModal]);
 
+  const saveConsent = (value: { necessary: boolean; analytics: boolean; marketing: boolean }) => {
+    localStorage.setItem('fg_cookie_consent', JSON.stringify(value));
+    // Notify the analytics loader (src/lib/analytics.ts)
+    window.dispatchEvent(new Event('fg-consent-changed'));
+  };
+
   const handleAcceptAll = () => {
-    localStorage.setItem('fg_cookie_consent', JSON.stringify({ necessary: true, analytics: true, marketing: true }));
+    saveConsent({ necessary: true, analytics: true, marketing: true });
     setShowBanner(false);
     setShowPreferencesModal(false);
   };
 
   const handleRejectNonEssential = () => {
-    localStorage.setItem('fg_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false }));
+    saveConsent({ necessary: true, analytics: false, marketing: false });
     setShowBanner(false);
     setShowPreferencesModal(false);
   };
 
   const handleSavePreferences = () => {
-    localStorage.setItem('fg_cookie_consent', JSON.stringify(preferences));
+    saveConsent(preferences);
     setShowBanner(false);
     setShowPreferencesModal(false);
   };

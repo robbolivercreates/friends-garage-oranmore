@@ -65,6 +65,19 @@ O desenvolvedor pode fazer esse processo inteiro.
 Atual: `friends2026`. Para trocar, edite `server.ts` (endpoint
 `/api/admin/login`) ou peça ao desenvolvedor.
 
+## 6. Google Tag Manager / Facebook Pixel (opcional)
+
+O site já está preparado. Basta:
+
+1. Criar um container gratuito em https://tagmanager.google.com
+2. Pegar o ID (formato `GTM-XXXXXXX`)
+3. Entregar ao desenvolvedor, ou definir `VITE_GTM_ID` no `.env` e rodar
+   `npm run build` novamente
+
+O GTM só carrega depois que o visitante aceita os cookies (conforme GDPR).
+O **Facebook Pixel** não precisa de código: instala-se dentro do próprio
+Tag Manager pelo painel do Google.
+
 ---
 
 ### Resumo do que já funciona hoje, sem nenhuma conta externa
