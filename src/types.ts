@@ -134,4 +134,7 @@ export interface SiteSettings {
   maxDailyBookings: number;
   heroVideoUrl?: string;
   enableHeroVideo?: boolean;
+  /** Bring-your-own-key: set via Staff Portal → Site Settings. Never exposed by the public settings endpoint. */
+  geminiApiKey?: string;
+  geminiModel?: string;
 }

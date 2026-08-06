@@ -17,7 +17,10 @@ import {
   Save,
   Wrench,
   MapPin,
-  MessageCircle
+  MessageCircle,
+  Bot,
+  PlusCircle,
+  Send
 } from 'lucide-react';
 import { Booking, EstimateRequest, CallbackRequest, RoadsideRequest, SiteSettings } from '../types';
 import { Reveal, staggerParent, staggerChild } from '../components/ui/Reveal';
@@ -26,7 +29,7 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type TabId = 'bookings' | 'estimates' | 'callbacks' | 'roadside' | 'blocked' | 'settings';
+type TabId = 'bookings' | 'estimates' | 'callbacks' | 'roadside' | 'blocked' | 'settings' | 'assistant';
 
 /** Consistent status pill colours across every inbox. */
 const statusPillClass = (status: string): string => {
@@ -84,6 +87,19 @@ const TIME_SLOTS = [
 
 const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'rescheduled', 'cancelled'];
 
+/** Authenticated fetch for staff endpoints — attaches the session token. */
+const api = (path: string, options: RequestInit = {}): Promise<Response> => {
+  const token = localStorage.getItem('fg_admin_token') || '';
+  return fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`
+    }
+  });
+};
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<TabId>('bookings');
   const [loading, setLoading] = useState(true);
@@ -110,24 +126,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // Reschedule editing (staff can freely move a booking to another day/time)
   const [rescheduleEditing, setRescheduleEditing] = useState<{ id: string; date: string; time: string } | null>(null);
 
+  // Services list (for the manual booking form)
+  const [services, setServices] = useState<{ id: string; name: string }[]>([]);
+
+  // Manual booking creation (walk-ins / phone bookings)
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manual, setManual] = useState({
+    customerName: '', phone: '', email: '', vehicleRegistration: '',
+    serviceName: '', bookingDate: '', bookingTime: '09:30', customerNotes: ''
+  });
+  const [manualMsg, setManualMsg] = useState<string | null>(null);
+
+  // AI Assistant chat
+  const [chat, setChat] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const [bRes, eRes, cRes, rRes, bdRes, sRes] = await Promise.all([
-        fetch('/api/bookings'),
-        fetch('/api/estimates'),
-        fetch('/api/callbacks'),
-        fetch('/api/roadside'),
-        fetch('/api/blocked-dates'),
-        fetch('/api/settings')
+        api('/api/bookings'),
+        api('/api/estimates'),
+        api('/api/callbacks'),
+        api('/api/roadside'),
+        api('/api/blocked-dates'),
+        api('/api/admin/settings')
       ]);
 
+      if (bRes.status === 401) { onLogout(); return; }
       if (bRes.ok) setBookings(await bRes.json());
       if (eRes.ok) setEstimates(await eRes.json());
       if (cRes.ok) setCallbacks(await cRes.json());
       if (rRes.ok) setRoadside(await rRes.json());
       if (bdRes.ok) setBlockedDates(await bdRes.json());
       if (sRes.ok) setSettings(await sRes.json());
+      fetch('/api/services').then(r => (r.ok ? r.json() : [])).then(setServices).catch(() => {});
     } catch (err) {
       console.error('Error loading admin data', err);
     } finally {
@@ -141,9 +175,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   const handleUpdateBookingStatus = async (id: string, status: string) => {
     try {
-      const res = await fetch(`/api/bookings/${id}`, {
+      const res = await api(`/api/bookings/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
       if (res.ok) {
@@ -172,9 +205,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const { id, date, time } = rescheduleEditing;
     if (!date || !time) return;
     try {
-      const res = await fetch(`/api/bookings/${id}`, {
+      const res = await api(`/api/bookings/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingDate: date, bookingTime: time, status: 'rescheduled' })
       });
       if (res.ok) {
@@ -186,11 +218,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
   };
 
+  /** Create a booking manually (walk-in / phone). Uses the staff override. */
+  const handleManualCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setManualMsg(null);
+    try {
+      const res = await api('/api/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          customerName: manual.customerName,
+          phone: manual.phone,
+          email: manual.email || 'walkin@friendsgarage.local',
+          vehicleRegistration: manual.vehicleRegistration || 'N/A',
+          serviceName: manual.serviceName || 'General Service',
+          bookingDate: manual.bookingDate,
+          bookingTime: manual.bookingTime,
+          customerNotes: manual.customerNotes,
+          override: true
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setManualMsg(`Booking created — ${data.referenceNumber}`);
+        setManual({ customerName: '', phone: '', email: '', vehicleRegistration: '', serviceName: '', bookingDate: '', bookingTime: '09:30', customerNotes: '' });
+        fetchData();
+      } else {
+        setManualMsg(data.error || 'Could not create booking.');
+      }
+    } catch (err) {
+      console.error(err);
+      setManualMsg('Network error.');
+    }
+  };
+
+  /** Send a message to the staff AI assistant. */
+  const handleChatSend = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const text = chatInput.trim();
+    if (!text || chatBusy) return;
+    const next = [...chat, { role: 'user' as const, text }];
+    setChat(next);
+    setChatInput('');
+    setChatBusy(true);
+    try {
+      const res = await api('/api/admin/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message: text, history: chat })
+      });
+      const data = await res.json();
+      setChat([...next, { role: 'model', text: data.reply || '(no reply)' }]);
+      fetchData(); // the assistant may have changed bookings
+    } catch {
+      setChat([...next, { role: 'model', text: 'Connection error — try again.' }]);
+    } finally {
+      setChatBusy(false);
+    }
+  };
+
   const handleSaveInternalNotes = async (id: string, notes: string) => {
     try {
-      const res = await fetch(`/api/bookings/${id}`, {
+      const res = await api(`/api/bookings/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ internalNotes: notes })
       });
       if (res.ok) {
@@ -206,9 +294,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     e.preventDefault();
     if (!newBlockedDate) return;
     try {
-      const res = await fetch('/api/blocked-dates', {
+      const res = await api('/api/blocked-dates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: newBlockedDate, reason: newBlockedReason })
       });
       if (res.ok) {
@@ -223,7 +310,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   const handleDeleteBlockedDate = async (id: string) => {
     try {
-      const res = await fetch(`/api/blocked-dates/${id}`, { method: 'DELETE' });
+      const res = await api(`/api/blocked-dates/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setBlockedDates(prev => prev.filter(b => b.id !== id));
       }
@@ -236,9 +323,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     e.preventDefault();
     if (!settings) return;
     try {
-      const res = await fetch('/api/settings', {
+      const res = await api('/api/settings', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
       if (res.ok) {
@@ -303,7 +389,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     { id: 'callbacks', label: 'Callbacks', count: callbacks.length, icon: PhoneCall },
     { id: 'roadside', label: 'Roadside', count: roadside.length, icon: ShieldAlert },
     { id: 'blocked', label: 'Blocked Dates', count: blockedDates.length, icon: CalendarX },
-    { id: 'settings', label: 'Site Settings', icon: Settings }
+    { id: 'settings', label: 'Site Settings', icon: Settings },
+    { id: 'assistant', label: 'AI Assistant', icon: Bot }
   ];
 
   return (
@@ -445,6 +532,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <p className="text-xs text-ink-300 px-1">
               Tip: every action can be undone — use the status dropdown on any booking to change it back, or "Reschedule" to move the date/time. The customer is emailed automatically on any change.
             </p>
+
+            {/* Manual booking (walk-in / phone) */}
+            <div className="card-dark p-5">
+              <button
+                onClick={() => setShowManualForm(!showManualForm)}
+                className="flex items-center gap-2 text-sm font-bold text-white hover:text-brand-400 transition-colors cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4 text-brand-400" />
+                {showManualForm ? 'Close manual booking form' : 'Add a booking manually (walk-in / phone customer)'}
+              </button>
+
+              {showManualForm && (
+                <form onSubmit={handleManualCreate} className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <input className="input-dark" required placeholder="Customer name *" value={manual.customerName} onChange={(e) => setManual({ ...manual, customerName: e.target.value })} />
+                  <input className="input-dark" required placeholder="Phone *" value={manual.phone} onChange={(e) => setManual({ ...manual, phone: e.target.value })} />
+                  <input className="input-dark" type="email" placeholder="Email (optional)" value={manual.email} onChange={(e) => setManual({ ...manual, email: e.target.value })} />
+                  <input className="input-dark uppercase" placeholder="Vehicle reg" value={manual.vehicleRegistration} onChange={(e) => setManual({ ...manual, vehicleRegistration: e.target.value })} />
+                  <select className="input-dark cursor-pointer" value={manual.serviceName} onChange={(e) => setManual({ ...manual, serviceName: e.target.value })}>
+                    <option value="">General Service</option>
+                    {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                  <div className="flex gap-2">
+                    <input className="input-dark flex-1" required type="date" value={manual.bookingDate} onChange={(e) => setManual({ ...manual, bookingDate: e.target.value })} />
+                    <select className="input-dark cursor-pointer !w-24" value={manual.bookingTime} onChange={(e) => setManual({ ...manual, bookingTime: e.target.value })}>
+                      {TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <input className="input-dark sm:col-span-2" placeholder="Notes (optional)" value={manual.customerNotes} onChange={(e) => setManual({ ...manual, customerNotes: e.target.value })} />
+                  <button type="submit" className="btn btn-primary">Create Booking</button>
+                  {manualMsg && <p className="sm:col-span-3 text-sm font-semibold text-emerald-400">{manualMsg}</p>}
+                </form>
+              )}
+            </div>
 
             {/* Bookings Table */}
             <div className="card-dark overflow-hidden">
@@ -901,9 +1021,97 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 </label>
               </div>
 
+              {/* AI Assistant — bring your own key */}
+              <div className="bg-ink-950/60 p-5 rounded-xl border border-white/10 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-brand-400" />
+                  <span className="font-bold text-white text-sm">AI Assistant (Bring Your Own Key)</span>
+                </div>
+                <p className="text-xs text-ink-300 leading-relaxed">
+                  Paste a free Gemini API key (from <span className="font-mono text-brand-400">aistudio.google.com/apikey</span>) to enable the AI Assistant tab.
+                  Stored in the workshop database — never shown on the public site.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label-dark">Gemini API Key</label>
+                    <input
+                      type="password"
+                      placeholder="AIzaSy…"
+                      value={settings.geminiApiKey || ''}
+                      onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
+                      className="input-dark font-mono"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className="label-dark">Model (optional)</label>
+                    <input
+                      type="text"
+                      placeholder="gemini-3.6-flash"
+                      value={settings.geminiModel || ''}
+                      onChange={(e) => setSettings({ ...settings, geminiModel: e.target.value })}
+                      className="input-dark font-mono"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <button type="submit" className="btn btn-primary">
                 <Save className="w-4 h-4" />
                 <span>Save Garage Settings</span>
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 7: AI ASSISTANT */}
+        {activeTab === 'assistant' && (
+          <div className="card-dark p-6 sm:p-8 space-y-5">
+            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="font-display text-xl font-bold text-white">Workshop AI Assistant</h2>
+                <p className="text-sm text-ink-300">Ask in plain language: search customers, create or move bookings (in bulk), block dates, get stats.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+              {chat.length === 0 && (
+                <div className="text-sm text-ink-300 bg-ink-950/60 border border-white/10 rounded-xl p-4 space-y-2">
+                  <p className="font-bold text-white">Try for example:</p>
+                  <p>• "What bookings do we have on Friday?"</p>
+                  <p>• "Find the customer with reg 201-G-4819"</p>
+                  <p>• "Add a phone booking: Mary, 087 1234567, brakes, tomorrow 10:00"</p>
+                  <p>• "Block next Monday — staff training"</p>
+                </div>
+              )}
+              {chat.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                    m.role === 'user'
+                      ? 'bg-brand-500 text-white rounded-br-sm'
+                      : 'bg-ink-950/60 border border-white/10 text-ink-200 rounded-bl-sm'
+                  }`}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              {chatBusy && <div className="text-sm text-ink-300 italic">Assistant is thinking…</div>}
+            </div>
+
+            <form onSubmit={handleChatSend} className="flex gap-2 pt-2 border-t border-white/10">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type a request, e.g. 'book John for tyres on Tuesday 14:30'…"
+                className="input-dark flex-1"
+              />
+              <button type="submit" disabled={chatBusy} className="btn btn-primary !px-4">
+                <Send className="w-4 h-4" />
               </button>
             </form>
           </div>

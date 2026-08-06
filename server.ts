@@ -1,8 +1,10 @@
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
 import * as db from './server/db.js';
+import { runAssistant, assistantConfigured } from './server/assistant.js';
 import {
   emailBookingReceivedCustomer,
   emailBookingReceivedGarage,
@@ -18,14 +20,75 @@ const PORT = 3000;
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+  // --- SECURITY HEADERS ---
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
+    next();
+  });
+
+  // --- ADMIN AUTH (Bearer tokens, in-memory) ---
+  const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || 'friends2026';
+  if (!process.env.ADMIN_PASSCODE) {
+    console.warn('[security] ADMIN_PASSCODE not set — using built-in default. Set it in .env before going live.');
+  }
+  const adminTokens = new Map<string, number>(); // token → expiry timestamp
+  const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12h sessions
+
+  const issueToken = () => {
+    const token = crypto.randomBytes(24).toString('hex');
+    adminTokens.set(token, Date.now() + TOKEN_TTL_MS);
+    return token;
+  };
+  const isValidToken = (token: string | undefined) => {
+    if (!token) return false;
+    const exp = adminTokens.get(token);
+    if (!exp) return false;
+    if (exp < Date.now()) { adminTokens.delete(token); return false; }
+    return true;
+  };
+  const requireAdmin: express.RequestHandler = (req, res, next) => {
+    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!isValidToken(token)) {
+      return res.status(401).json({ error: 'Staff authentication required' });
+    }
+    next();
+  };
+
+  // --- RATE LIMITING (simple in-memory buckets for public write endpoints) ---
+  const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+  const rateLimit = (max: number, windowMs: number): express.RequestHandler => (req, res, next) => {
+    const key = `${req.ip}|${req.path}`;
+    const now = Date.now();
+    const bucket = rateBuckets.get(key);
+    if (!bucket || bucket.resetAt < now) {
+      rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > max) {
+      return res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
+    }
+    next();
+  };
+  const publicWriteLimit = rateLimit(30, 10 * 60 * 1000); // 30 writes / 10 min / IP / endpoint
 
   // Helper for generating ref numbers
   const generateRef = (prefix: string) => {
     const rand = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}-2026-${rand}`;
   };
+
+  // Basic input hygiene for public forms
+  const cleanStr = (v: any, max = 300) => String(v ?? '').slice(0, max).trim();
+  const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+  const isDateStr = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v));
+  const isTimeStr = (v: string) => /^\d{2}:\d{2}$/.test(v);
 
   // --- REST API ENDPOINTS ---
 
@@ -59,7 +122,7 @@ async function startServer() {
   });
 
   // Add Review
-  app.post('/api/reviews', (req, res) => {
+  app.post('/api/reviews', publicWriteLimit, (req, res) => {
     const newReview = {
       id: `rev-${Date.now()}`,
       author: req.body.author || 'Anonymous',
@@ -73,13 +136,19 @@ async function startServer() {
     res.status(201).json(newReview);
   });
 
-  // Get Site Settings
+  // Get Site Settings (public — sensitive staff fields stripped)
   app.get('/api/settings', (req, res) => {
+    const { geminiApiKey, ...publicSettings } = db.getSettings() as any;
+    res.json(publicSettings);
+  });
+
+  // Get FULL Site Settings (staff only — includes the AI key)
+  app.get('/api/admin/settings', requireAdmin, (req, res) => {
     res.json(db.getSettings());
   });
 
-  // Update Settings
-  app.patch('/api/settings', (req, res) => {
+  // Update Settings (staff only)
+  app.patch('/api/settings', requireAdmin, (req, res) => {
     res.json(db.updateSettings(req.body));
   });
 
@@ -88,13 +157,13 @@ async function startServer() {
     res.json(db.getAvailability(req.query.date as string | undefined));
   });
 
-  // Get Bookings
-  app.get('/api/bookings', (req, res) => {
+  // Get Bookings (staff only — contains customer PII)
+  app.get('/api/bookings', requireAdmin, (req, res) => {
     res.json(db.getBookings());
   });
 
-  // Create Booking
-  app.post('/api/bookings', (req, res) => {
+  // Create Booking (public, rate-limited + validated)
+  app.post('/api/bookings', publicWriteLimit, (req, res) => {
     const {
       serviceId,
       serviceName,
@@ -116,48 +185,63 @@ async function startServer() {
       customerNotes
     } = req.body;
 
-    if (!customerName || !phone || !email || !bookingDate || !bookingTime || !vehicleRegistration) {
+    // Sanitise + validate
+    const safeName = cleanStr(customerName, 120);
+    const safeEmail = cleanStr(email, 160);
+    const safePhone = cleanStr(phone, 40);
+    if (!safeName || !safePhone || !safeEmail || !bookingDate || !bookingTime || !vehicleRegistration) {
       return res.status(400).json({ error: 'Missing required booking fields' });
     }
+    if (!isEmail(safeEmail)) {
+      return res.status(400).json({ error: 'Please provide a valid email address.' });
+    }
+    if (!isDateStr(bookingDate) || !isTimeStr(bookingTime)) {
+      return res.status(400).json({ error: 'Invalid date or time format.' });
+    }
+
+    // Staff with a valid session may override availability (manual phone bookings etc.)
+    const staffOverride = req.body.override === true && isValidToken((req.headers.authorization || '').replace(/^Bearer\s+/i, ''));
 
     // --- Availability validation (mirrors what the booking form shows) ---
-    const requestedDay = new Date(`${bookingDate}T00:00:00`).getDay();
-    if (requestedDay === 0) {
-      return res.status(409).json({ error: 'The garage is closed on Sundays. Please choose a Monday to Saturday date.' });
-    }
-    if (db.isDateBlocked(bookingDate)) {
-      return res.status(409).json({ error: 'This date is unavailable (holiday / closed). Please choose another day.' });
-    }
-    if (db.isSlotTaken(bookingDate, bookingTime)) {
-      return res.status(409).json({ error: 'That time slot has just been taken. Please pick another time.' });
-    }
-    const maxDaily = db.getSettings().maxDailyBookings || 12;
-    if (db.dayBookingCount(bookingDate) >= maxDaily) {
-      return res.status(409).json({ error: 'This day is fully booked. Please choose another date.' });
+    if (!staffOverride) {
+      const requestedDay = new Date(`${bookingDate}T00:00:00`).getDay();
+      if (requestedDay === 0) {
+        return res.status(409).json({ error: 'The garage is closed on Sundays. Please choose a Monday to Saturday date.' });
+      }
+      if (db.isDateBlocked(bookingDate)) {
+        return res.status(409).json({ error: 'This date is unavailable (holiday / closed). Please choose another day.' });
+      }
+      if (db.isSlotTaken(bookingDate, bookingTime)) {
+        return res.status(409).json({ error: 'That time slot has just been taken. Please pick another time.' });
+      }
+      const maxDaily = db.getSettings().maxDailyBookings || 12;
+      if (db.dayBookingCount(bookingDate) >= maxDaily) {
+        return res.status(409).json({ error: 'This day is fully booked. Please choose another date.' });
+      }
     }
 
     const newBooking = {
       id: `b-${Date.now()}`,
       referenceNumber: generateRef('FG'),
-      serviceId: serviceId || 'general',
-      serviceName: serviceName || 'General Service',
-      customerName,
-      email,
-      phone,
+      serviceId: cleanStr(serviceId, 80) || 'general',
+      serviceName: cleanStr(serviceName, 160) || 'General Service',
+      customerName: safeName,
+      email: safeEmail,
+      phone: safePhone,
       preferredContact: preferredContact || 'phone',
-      vehicleMake: vehicleMake || '',
-      vehicleModel: vehicleModel || '',
-      vehicleYear: vehicleYear || '',
-      vehicleRegistration: vehicleRegistration.toUpperCase().trim(),
+      vehicleMake: cleanStr(vehicleMake, 60),
+      vehicleModel: cleanStr(vehicleModel, 60),
+      vehicleYear: cleanStr(vehicleYear, 10),
+      vehicleRegistration: cleanStr(vehicleRegistration, 20).toUpperCase(),
       fuelType: fuelType || 'diesel',
-      mileage: mileage || '',
+      mileage: cleanStr(mileage, 20),
       transmission: transmission || 'manual',
-      problemDescription: problemDescription || '',
+      problemDescription: cleanStr(problemDescription, 1000),
       bookingDate,
       bookingTime,
       durationMinutes: Number(durationMinutes) || 60,
       status: db.getSettings().autoConfirmBookings ? 'confirmed' : 'pending',
-      customerNotes: customerNotes || '',
+      customerNotes: cleanStr(customerNotes, 1000),
       createdAt: new Date().toISOString()
     };
 
@@ -171,8 +255,8 @@ async function startServer() {
     ]).catch(err => console.error('[mailer] booking notification failed', err));
   });
 
-  // Update Booking status / notes / date
-  app.patch('/api/bookings/:id', (req, res) => {
+  // Update Booking status / notes / date (staff only)
+  app.patch('/api/bookings/:id', requireAdmin, (req, res) => {
     const current = db.getBookings().find(b => b.id === req.params.id || b.referenceNumber === req.params.id);
     if (!current) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -189,8 +273,8 @@ async function startServer() {
     }
   });
 
-  // Delete / Cancel Booking
-  app.delete('/api/bookings/:id', (req, res) => {
+  // Delete / Cancel Booking (staff only)
+  app.delete('/api/bookings/:id', requireAdmin, (req, res) => {
     const updated = db.updateBooking(req.params.id, { status: 'cancelled' });
     if (!updated) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -199,11 +283,11 @@ async function startServer() {
   });
 
   // Estimates API
-  app.get('/api/estimates', (req, res) => {
+  app.get('/api/estimates', requireAdmin, (req, res) => {
     res.json(db.getEstimates());
   });
 
-  app.post('/api/estimates', (req, res) => {
+  app.post('/api/estimates', publicWriteLimit, (req, res) => {
     const newEstimate = {
       id: `est-${Date.now()}`,
       referenceNumber: generateRef('EST'),
@@ -233,11 +317,11 @@ async function startServer() {
   });
 
   // Callback requests API
-  app.get('/api/callbacks', (req, res) => {
+  app.get('/api/callbacks', requireAdmin, (req, res) => {
     res.json(db.getCallbacks());
   });
 
-  app.post('/api/callbacks', (req, res) => {
+  app.post('/api/callbacks', publicWriteLimit, (req, res) => {
     const newCallback = {
       id: `cb-${Date.now()}`,
       name: req.body.name,
@@ -258,11 +342,11 @@ async function startServer() {
   });
 
   // Roadside Requests API
-  app.get('/api/roadside', (req, res) => {
+  app.get('/api/roadside', requireAdmin, (req, res) => {
     res.json(db.getRoadside());
   });
 
-  app.post('/api/roadside', (req, res) => {
+  app.post('/api/roadside', publicWriteLimit, (req, res) => {
     const newRoadside = {
       id: `rs-${Date.now()}`,
       referenceNumber: generateRef('EMG'),
@@ -291,7 +375,7 @@ async function startServer() {
     res.json(db.getBlockedDates());
   });
 
-  app.post('/api/blocked-dates', (req, res) => {
+  app.post('/api/blocked-dates', requireAdmin, (req, res) => {
     const newBlocked = {
       id: `bd-${Date.now()}`,
       date: req.body.date,
@@ -301,17 +385,32 @@ async function startServer() {
     res.status(201).json(newBlocked);
   });
 
-  app.delete('/api/blocked-dates/:id', (req, res) => {
+  app.delete('/api/blocked-dates/:id', requireAdmin, (req, res) => {
     db.deleteBlockedDate(req.params.id);
     res.json({ message: 'Blocked date removed' });
   });
 
-  // Admin auth check endpoint
-  app.post('/api/admin/login', (req, res) => {
+  // Staff AI assistant (Gemini function calling over the workshop data)
+  app.post('/api/admin/chat', requireAdmin, async (req, res) => {
+    if (!assistantConfigured()) {
+      return res.json({
+        reply: 'AI assistant is not configured yet — add GEMINI_API_KEY to the server .env and restart. (All features remain available in the tabs above.)'
+      });
+    }
+    try {
+      const reply = await runAssistant(String(req.body.message || ''), Array.isArray(req.body.history) ? req.body.history : []);
+      res.json({ reply });
+    } catch (err) {
+      console.error('[assistant] error', err);
+      res.status(500).json({ reply: 'Sorry — the assistant hit an error. Try again in a moment.' });
+    }
+  });
+
+  // Admin auth — issues a real session token (12h, in-memory)
+  app.post('/api/admin/login', rateLimit(10, 10 * 60 * 1000), (req, res) => {
     const { passcode } = req.body;
-    // Simple passcode check for demo admin access
-    if (passcode === 'admin123' || passcode === 'friends2026') {
-      res.json({ success: true, token: 'fg-admin-token-2026', role: 'manager', user: 'Wesley Da Silva' });
+    if (passcode && passcode === ADMIN_PASSCODE) {
+      res.json({ success: true, token: issueToken(), role: 'manager', user: 'Wesley Da Silva' });
     } else {
       res.status(401).json({ success: false, error: 'Invalid passcode' });
     }

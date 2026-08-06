@@ -81,8 +81,14 @@ GUIA-DE-ATIVACAO.md       Client-facing activation guide (Portuguese)
 | GET/POST `/estimates` | Quote requests |
 | GET/POST `/callbacks` | Callback requests |
 | GET/POST `/roadside` | Emergency dispatch requests |
-| GET/POST/DELETE `/blocked-dates[/:idOrDate]` | Staff-blocked days |
-| POST `/admin/login` | Passcode → token (passcodes hardcoded in server.ts: `friends2026`, `admin123` — client asked for simple auth) |
+| GET/POST/DELETE `/blocked-dates[/:idOrDate]` | Staff-blocked days (write = staff only) |
+| POST `/admin/login` | Passcode → 12h Bearer token (passcode from `ADMIN_PASSCODE` env) |
+| POST `/admin/chat` | Staff AI assistant (Gemini function calling; needs `GEMINI_API_KEY`) |
+
+**Auth model:** all endpoints that read or mutate customer data require
+`Authorization: Bearer <token>` from `/api/admin/login`. Public: services,
+team, reviews, settings GET, availability, and the public POST forms
+(rate-limited 30/10min/IP, input-validated).
 
 Reference numbers: `FG-2026-XXXX` bookings, `EST-`, `EMG-` (see
 `generateRef` in server.ts).
@@ -105,8 +111,17 @@ Reference numbers: `FG-2026-XXXX` bookings, `EST-`, `EMG-` (see
    portal; public availability MUST go through `/api/availability` only.
 7. **Keep en-IE / Irish context**: € pricing, Eircodes, NCT references,
    `toLocaleDateString('en-IE', ...)`.
-8. Don't commit `data/`, `.env`. Admin passcode change: `server.ts`
-   `/api/admin/login`.
+8. Don't commit `data/`, `.env`. Staff passcode: `ADMIN_PASSCODE` env
+   (never hardcode). New staff-only endpoint → add `requireAdmin`.
+9. **Staff assistant**: `server/assistant.ts` holds the Gemini tool loop.
+   New capability → add a function declaration + a case in `executeTool`
+   (db access only via `server/db.ts`). Key/model resolution is BYOK:
+   Site Settings (DB) → `GEMINI_API_KEY`/`GEMINI_MODEL` env → default
+   `gemini-3.6-flash`. The public `/api/settings` MUST keep stripping
+   `geminiApiKey`; staff read it via `/api/admin/settings`.
+10. Staff can create bookings manually (admin form or assistant) using
+    `override: true` + a valid token — the public availability checks are
+    skipped ONLY for authenticated staff.
 
 ## Gotchas (learned the hard way)
 
