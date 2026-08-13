@@ -20,7 +20,8 @@ import {
   MessageCircle,
   Bot,
   PlusCircle,
-  Send
+  Send,
+  CarFront
 } from 'lucide-react';
 import { Booking, EstimateRequest, CallbackRequest, RoadsideRequest, SiteSettings } from '../types';
 import { Reveal, staggerParent, staggerChild } from '../components/ui/Reveal';
@@ -29,7 +30,7 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type TabId = 'workshop' | 'bookings' | 'estimates' | 'callbacks' | 'roadside' | 'blocked' | 'settings' | 'assistant';
+type TabId = 'workshop' | 'vehicles' | 'bookings' | 'estimates' | 'callbacks' | 'roadside' | 'blocked' | 'settings' | 'assistant';
 
 /** Consistent status pill colours across every inbox. */
 const statusPillClass = (status: string): string => {
@@ -89,6 +90,7 @@ const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'rescheduled', 'c
 
 import { api } from './admin/api';
 import WorkshopBoard from './admin/WorkshopBoard';
+import VehiclesPanel from './admin/VehiclesPanel';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<TabId>('workshop');
@@ -375,6 +377,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   const tabs: { id: TabId; label: string; count?: number; icon: React.ElementType }[] = [
     { id: 'workshop', label: 'Workshop', icon: Wrench },
+    { id: 'vehicles', label: 'Vehicles', icon: CarFront },
     { id: 'bookings', label: 'Bookings', count: bookings.length, icon: Calendar },
     { id: 'estimates', label: 'Estimates', count: estimates.length, icon: FileText },
     { id: 'callbacks', label: 'Callbacks', count: callbacks.length, icon: PhoneCall },
@@ -491,6 +494,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         {/* TAB 1: BOOKINGS MANAGER */}
         {/* TAB 0: WORKSHOP KANBAN */}
         {activeTab === 'workshop' && <WorkshopBoard />}
+
+        {/* TAB 0.5: VEHICLE DATABASE */}
+        {activeTab === 'vehicles' && <VehiclesPanel />}
 
         {/* TAB 1: BOOKINGS MANAGER */}
         {activeTab === 'bookings' && (
