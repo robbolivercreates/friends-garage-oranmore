@@ -54,6 +54,18 @@ CREATE TABLE IF NOT EXISTS blocked_dates (
   date TEXT UNIQUE,
   reason TEXT
 );
+CREATE TABLE IF NOT EXISTS vehicles (
+  id TEXT PRIMARY KEY,
+  registration TEXT UNIQUE,
+  data TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS service_records (
+  id TEXT PRIMARY KEY,
+  vehicleId TEXT NOT NULL,
+  date TEXT,
+  data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_service_records_vehicle ON service_records(vehicleId);
 `);
 
 /* ---------------------------- seeding / migration ---------------------------- */
@@ -217,4 +229,93 @@ export function addBlockedDate(bd: any) {
 }
 export function deleteBlockedDate(idOrDate: string) {
   db.prepare(`DELETE FROM blocked_dates WHERE id = ? OR date = ?`).run(idOrDate, idOrDate);
+}
+
+/* ------------------------------------------------------------------ */
+/*  VEHICLES — self-building database keyed by registration            */
+/* ------------------------------------------------------------------ */
+
+export function getVehicles(query?: string) {
+  const rows = db.prepare(`SELECT data FROM vehicles ORDER BY json_extract(data,'$.lastSeenAt') DESC`).all() as any[];
+  let list = rows.map(r => JSON.parse(r.data));
+  if (query) {
+    const q = query.toLowerCase();
+    list = list.filter((v: any) =>
+      [v.registration, v.make, v.model, v.displayPlate, v.customerName]
+        .some((f: string) => (f || '').toLowerCase().includes(q)));
+  }
+  return list;
+}
+
+export function getVehicleByReg(registration: string) {
+  const norm = registration.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const row = db.prepare(`SELECT data FROM vehicles WHERE registration = ?`).get(norm) as any;
+  return row ? JSON.parse(row.data) : null;
+}
+
+export function upsertVehicle(vehicle: any) {
+  const existing = getVehicleByReg(vehicle.registration);
+  const merged = existing
+    ? { ...existing, ...vehicle, registration: existing.registration, lastSeenAt: new Date().toISOString() }
+    : {
+        id: `veh-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        createdAt: new Date().toISOString(),
+        firstSeenAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+        ...vehicle,
+        registration: vehicle.registration.toUpperCase().replace(/[^A-Z0-9]/g, '')
+      };
+  db.prepare(`INSERT INTO vehicles (id, registration, data) VALUES (?, ?, ?)
+    ON CONFLICT(registration) DO UPDATE SET data = excluded.data`)
+    .run(merged.id, merged.registration, JSON.stringify(merged));
+  return merged;
+}
+
+export function updateVehicle(registration: string, patch: Record<string, any>) {
+  const existing = getVehicleByReg(registration);
+  if (!existing) return null;
+  const merged = { ...existing, ...patch, registration: existing.registration, lastSeenAt: new Date().toISOString() };
+  db.prepare(`UPDATE vehicles SET data = ? WHERE registration = ?`).run(JSON.stringify(merged), existing.registration);
+  return merged;
+}
+
+/** Auto-register/update a vehicle whenever a booking comes in. */
+export function upsertVehicleFromBooking(booking: any, parsed?: any) {
+  if (!booking.vehicleRegistration) return;
+  return upsertVehicle({
+    registration: booking.vehicleRegistration,
+    displayPlate: booking.vehicleRegistration,
+    make: booking.vehicleMake || undefined,
+    model: booking.vehicleModel || undefined,
+    year: booking.vehicleYear || parsed?.year || undefined,
+    fuelType: booking.fuelType || undefined,
+    transmission: booking.transmission || undefined,
+    county: parsed?.county,
+    plateFormat: parsed?.format,
+    customerName: booking.customerName,
+    customerPhone: booking.phone,
+    customerEmail: booking.email
+  });
+}
+
+/* service records (history, parts, notes) */
+export function getServiceHistory(vehicleId: string) {
+  return (db.prepare(`SELECT data FROM service_records WHERE vehicleId = ? ORDER BY date DESC, json_extract(data,'$.createdAt') DESC`).all(vehicleId) as any[])
+    .map(r => JSON.parse(r.data));
+}
+
+export function addServiceRecord(record: any) {
+  const full = {
+    id: `sr-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    createdAt: new Date().toISOString(),
+    date: record.date || new Date().toISOString().split('T')[0],
+    ...record
+  };
+  db.prepare(`INSERT INTO service_records (id, vehicleId, date, data) VALUES (?, ?, ?, ?)`)
+    .run(full.id, full.vehicleId, full.date, JSON.stringify(full));
+  return full;
+}
+
+export function deleteServiceRecord(id: string) {
+  db.prepare(`DELETE FROM service_records WHERE id = ?`).run(id);
 }

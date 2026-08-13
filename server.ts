@@ -5,6 +5,8 @@ import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
 import * as db from './server/db.js';
 import { runAssistant, assistantConfigured } from './server/assistant.js';
+import { parsePlate, formatPlate } from './server/plates.js';
+import { lookupWithProviders } from './server/vehicleProviders.js';
 import {
   emailBookingReceivedCustomer,
   emailBookingReceivedGarage,
@@ -246,6 +248,8 @@ async function startServer() {
     };
 
     db.addBooking(newBooking);
+    // Self-building vehicle database: every booking feeds the vehicle record
+    db.upsertVehicleFromBooking(newBooking, parsePlate(newBooking.vehicleRegistration));
     res.status(201).json(newBooking);
 
     // Fire notifications after responding — mail must never block a booking
@@ -407,6 +411,125 @@ async function startServer() {
       console.error('[assistant] error', err);
       res.status(500).json({ reply: 'Sorry — the assistant hit an error. Try again in a moment.' });
     }
+  });
+
+  /* ---------------- VEHICLES API (staff only) ---------------- */
+
+  // Parse a plate (staff form autofill)
+  app.get('/api/plates/parse/:reg', requireAdmin, (req, res) => {
+    const parsed = parsePlate(req.params.reg);
+    res.json({ ...parsed, displayPlate: formatPlate(req.params.reg) });
+  });
+
+  // List / search vehicles
+  app.get('/api/vehicles', requireAdmin, (req, res) => {
+    res.json(db.getVehicles(req.query.q as string | undefined));
+  });
+
+  // Single vehicle + full history + linked bookings
+  app.get('/api/vehicles/:reg', requireAdmin, async (req, res) => {
+    const vehicle = db.getVehicleByReg(req.params.reg);
+    const norm = req.params.reg.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const bookings = db.getBookings().filter(
+      b => (b.vehicleRegistration || '').toUpperCase().replace(/[^A-Z0-9]/g, '') === norm
+    );
+    if (!vehicle) {
+      const parsed = parsePlate(req.params.reg);
+      const { info, provider } = await lookupWithProviders(norm);
+      return res.status(404).json({
+        error: 'Vehicle not found',
+        parsed,
+        displayPlate: formatPlate(req.params.reg),
+        providerInfo: info,
+        provider,
+        bookings
+      });
+    }
+    res.json({
+      vehicle,
+      displayPlate: formatPlate(vehicle.registration),
+      serviceHistory: db.getServiceHistory(vehicle.id),
+      bookings
+    });
+  });
+
+  // Create / update vehicle (first visit manual entry)
+  app.post('/api/vehicles', requireAdmin, (req, res) => {
+    if (!cleanStr(req.body.registration)) {
+      return res.status(400).json({ error: 'Registration is required' });
+    }
+    const parsed = parsePlate(req.body.registration);
+    const vehicle = db.upsertVehicle({
+      registration: req.body.registration,
+      displayPlate: formatPlate(req.body.registration),
+      make: cleanStr(req.body.make, 60) || undefined,
+      model: cleanStr(req.body.model, 60) || undefined,
+      engine: cleanStr(req.body.engine, 80) || undefined,
+      year: cleanStr(req.body.year) || parsed.year?.toString(),
+      fuelType: cleanStr(req.body.fuelType, 30) || undefined,
+      transmission: cleanStr(req.body.transmission, 30) || undefined,
+      colour: cleanStr(req.body.colour, 30) || undefined,
+      county: cleanStr(req.body.county, 40) || parsed.county,
+      plateFormat: parsed.format,
+      customerName: cleanStr(req.body.customerName, 120) || undefined,
+      customerPhone: cleanStr(req.body.customerPhone, 40) || undefined,
+      customerEmail: cleanStr(req.body.customerEmail, 160) || undefined,
+      notes: cleanStr(req.body.notes, 1000) || undefined
+    });
+    res.status(201).json({ vehicle, parsed });
+  });
+
+  app.patch('/api/vehicles/:reg', requireAdmin, (req, res) => {
+    const updated = db.updateVehicle(req.params.reg, req.body);
+    if (!updated) return res.status(404).json({ error: 'Vehicle not found' });
+    res.json(updated);
+  });
+
+  // Service records (history, parts, notes)
+  app.post('/api/vehicles/:reg/records', requireAdmin, (req, res) => {
+    const vehicle = db.getVehicleByReg(req.params.reg);
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+    if (!cleanStr(req.body.serviceName)) {
+      return res.status(400).json({ error: 'Service name is required' });
+    }
+    const record = db.addServiceRecord({
+      vehicleId: vehicle.id,
+      date: cleanStr(req.body.date, 10) || undefined,
+      serviceName: cleanStr(req.body.serviceName, 160),
+      technician: cleanStr(req.body.technician, 80) || undefined,
+      partsUsed: Array.isArray(req.body.partsUsed) ? req.body.partsUsed.slice(0, 50).map((p: any) => cleanStr(p, 120)) : [],
+      notes: cleanStr(req.body.notes, 1000),
+      bookingRef: cleanStr(req.body.bookingRef, 30) || undefined
+    });
+    res.status(201).json(record);
+  });
+
+  app.delete('/api/vehicles/records/:id', requireAdmin, (req, res) => {
+    db.deleteServiceRecord(req.params.id);
+    res.json({ message: 'Record deleted' });
+  });
+
+  /* ---------------- WORKSHOP KANBAN (staff only) ---------------- */
+
+  app.get('/api/workshop', requireAdmin, (req, res) => {
+    const active = db.getBookings().filter(b => !['completed', 'cancelled'].includes(b.status));
+    const cards = active.map(b => ({
+      id: b.id,
+      referenceNumber: b.referenceNumber,
+      customerName: b.customerName,
+      phone: b.phone,
+      vehicleRegistration: b.vehicleRegistration,
+      vehicle: `${b.vehicleMake} ${b.vehicleModel}`.trim(),
+      serviceName: b.serviceName,
+      bookingDate: b.bookingDate,
+      bookingTime: b.bookingTime,
+      bookingStatus: b.status,
+      workflowStatus: (b as any).workflowStatus || 'booked_in',
+      bay: (b as any).bay || null,
+      technician: (b as any).technician || null,
+      problemDescription: b.problemDescription || ''
+    }));
+    res.json(cards);
   });
 
   // Admin auth — issues a real session token (12h, in-memory)

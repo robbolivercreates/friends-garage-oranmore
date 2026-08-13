@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Friends Garage — Build Progress</title>
+<style>
+  :root { --ink:#0A0B0E; --brand:#D5004F; --paper:#F6F6F3; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--ink); color: #E8E9EB; padding: 40px 20px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 26px; letter-spacing: -0.5px; }
+  h1 span { color: var(--brand); }
+  .sub { color: #8B919C; margin: 6px 0 30px; font-size: 14px; }
+  .wave { background: #14161B; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; }
+  .wave h2 { font-size: 16px; display: flex; align-items: center; gap: 10px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 99px; text-transform: uppercase; letter-spacing: .08em; }
+  .done { background: rgba(16,185,129,.15); color: #34D399; border: 1px solid rgba(16,185,129,.3); }
+  .active { background: rgba(213,0,79,.15); color: #F0326F; border: 1px solid rgba(213,0,79,.35); }
+  .next { background: rgba(255,255,255,.05); color: #8B919C; border: 1px solid rgba(255,255,255,.12); }
+  ul { margin: 12px 0 0 18px; font-size: 13.5px; color: #B9BEC7; line-height: 1.7; }
+  .bar { height: 6px; background: rgba(255,255,255,.07); border-radius: 99px; margin: 26px 0 8px; overflow: hidden; }
+  .bar div { height: 100%; background: linear-gradient(90deg, var(--brand), #F0326F); width: 20%; transition: width .4s; }
+  .pct { font-size: 12px; color: #8B919C; font-family: ui-monospace, monospace; }
+  .critic { font-size: 12.5px; color: #8B919C; margin-top: 10px; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FRIENDS<span>.</span>GARAGE — Elevation Build</h1>
+  <p class="sub">Shopmonkey/Tekmetric-class upgrade • live progress • updated after every wave</p>
+
+  <div class="bar"><div style="width:55%"></div></div>
+  <div class="pct">Wave 3 of 5 in progress — ~55%</div>
+
+  <div class="wave">
+    <h2>Wave 0 — Audit &amp; Test Gate <span class="badge done">done</span></h2>
+    <ul>
+      <li>Full feature audit (<code>AUDIT.md</code>) — every existing feature mapped &amp; protected</li>
+      <li>Automated test suite (parser units + full API integration) — hard gate, must stay green</li>
+      <li>This progress page</li>
+    </ul>
+  </div>
+
+  <div class="wave">
+    <h2>Wave 1 — Vehicle Intelligence <span class="badge done">done</span></h2>
+    <ul>
+      <li>Irish + UK plate parser (year / county / half-year autofill)</li>
+      <li>Vehicles &amp; service-records tables (SQLite)</li>
+      <li>Provider abstraction: NoOp now, paid lookup later with just an API key</li>
+      <li>Vehicle API endpoints (staff-only)</li>
+    </ul>
+  </div>
+
+  <div class="wave">
+    <h2>Wave 2 — Vehicle UX <span class="badge active">in progress</span></h2>
+    <ul>
+      <li>Type plate → instant full record + service history + parts + notes</li>
+      <li>First visit: make → model → engine smart dropdowns</li>
+      <li>Auto-link bookings to vehicles by plate</li>
+    </ul>
+  </div>
+
+  <div class="wave">
+    <h2>Wave 3 — Workshop Kanban <span class="badge active">in progress</span></h2>
+    <ul>
+      <li>Trello-simple board: Booked In → Diagnosis → Waiting Parts → In Progress → QC → Ready</li>
+      <li>Bay + technician assignment per card</li>
+    </ul>
+  </div>
+
+  <div class="wave">
+    <h2>Wave 4 — Critic Loops &amp; Polish <span class="badge next">next</span></h2>
+    <ul>
+      <li>Fresh-context critic reviews vs Shopmonkey / Tekmetric / Trello standards</li>
+      <li>"Zero training" usability pass, coherence sweep, final green gate</li>
+    </ul>
+    <p class="critic">Critics: pending first submission.</p>
+  </div>
+</div>
+</body>
+</html>
