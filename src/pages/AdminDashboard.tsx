@@ -958,6 +958,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 </span>
               </div>
 
+              <div className="sm:col-span-2">
+                <label className="label-dark">Roadside Dispatch Hours Note</label>
+                <input
+                  type="text"
+                  value={settings.roadsideHoursNote || ''}
+                  onChange={(e) => setSettings({ ...settings, roadsideHoursNote: e.target.value })}
+                  className="input-dark"
+                />
+                <span className="text-xs text-ink-300 block mt-1.5">
+                  Shown on the roadside page above the dispatch form — tells customers when emergency recovery operates.
+                </span>
+              </div>
+
               <div>
                 <label className="label-dark">Telephone Contact Number</label>
                 <input

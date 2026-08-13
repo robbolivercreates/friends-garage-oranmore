@@ -81,7 +81,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </a>
             <div className="hidden lg:flex items-center gap-2">
               <MapPin className="w-3.5 h-3.5 text-brand-400" />
-              <span>Deerpark Industrial Estate, Oranmore, Galway (H91 H31C)</span>
+              <span>Unit 5, Deerpark Ind. Est., Oranmore, Galway (H91 H31C)</span>
             </div>
           </div>
 
@@ -264,7 +264,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="card-dark p-4 flex flex-col gap-3 text-sm">
                   <div className="flex items-center gap-3 text-ink-200">
                     <MapPin className="w-4 h-4 text-brand-400 shrink-0" />
-                    <span>Deerpark Industrial Estate, Oranmore, Galway</span>
+                    <span>Unit 5, Deerpark Ind. Est., Oranmore</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
                     <span className="flex items-center gap-3 text-ink-300">

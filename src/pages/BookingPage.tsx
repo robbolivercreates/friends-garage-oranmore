@@ -211,7 +211,7 @@ PRODID:-//Friends Garage Oranmore//NONSGML v1.0//EN
 BEGIN:VEVENT
 SUMMARY:Car Service at Friends Garage (${bookingConfirmed.serviceName})
 DESCRIPTION:Appointment at Friends Garage for vehicle ${bookingConfirmed.vehicleRegistration}. Ref: ${bookingConfirmed.referenceNumber}
-LOCATION:Deerpark Industrial Estate, Oranmore, Galway H91 H31C
+LOCATION:Unit 5\, Deerpark Industrial Estate\, Carrowmoneash\, Oranmore\, Co. Galway H91 H31C
 DTSTART:${bookingConfirmed.bookingDate.replace(/-/g, '')}T${bookingConfirmed.bookingTime.replace(':', '')}00Z
 DURATION:PT${bookingConfirmed.durationMinutes}M
 END:VEVENT
@@ -341,13 +341,8 @@ END:VCALENDAR`;
                           <p className="text-sm text-ink-400 leading-relaxed line-clamp-2">{serv.shortDescription}</p>
 
                           <div className="flex items-center justify-between pt-3 border-t border-ink-950/8 text-sm">
-                            <span className="flex items-center gap-1.5 text-ink-400">
-                              <Clock className="w-4 h-4" />
-                              {serv.estimatedDurationMinutes} mins
-                            </span>
-                            <span className="font-mono font-bold text-brand-500">
-                              {serv.priceType === 'from' ? `From €${serv.priceAmount}` : 'Quote'}
-                            </span>
+                            <span className="text-ink-400">Priced after inspection</span>
+                            <span className="font-mono font-bold text-brand-500">Quote</span>
                           </div>
                         </button>
                       );
@@ -541,12 +536,12 @@ END:VCALENDAR`;
                     </div>
                   </div>
 
-                  <div className="bg-ink-950 text-white p-5 rounded-2xl flex items-center gap-4">
-                    <Clock className="w-6 h-6 text-brand-400 shrink-0" />
+                  <div className="bg-ink-950 text-white p-5 rounded-2xl flex items-start gap-4">
+                    <Clock className="w-6 h-6 text-brand-400 shrink-0 mt-0.5" />
                     <div className="text-sm">
-                      <span className="font-bold block">Estimated Drop-off &amp; Duration:</span>
-                      <span className="text-ink-200">
-                        {selectedService.name} requires approximately {selectedService.estimatedDurationMinutes} minutes. You can drop off your car at {bookingTime} on {bookingDate}.
+                      <span className="font-bold block">This is a drop-off time *</span>
+                      <span className="text-ink-200 leading-relaxed">
+                        Please note that your vehicle may or may not be completed on the same day — please speak to our Customer Service Agent for more details.
                       </span>
                     </div>
                   </div>
@@ -670,7 +665,7 @@ END:VCALENDAR`;
                       <div className="font-bold text-ink-950 text-base">{selectedService.name}</div>
                       <div className="text-sm text-ink-400">{selectedService.shortDescription}</div>
                       <div className="text-sm text-ink-400 font-medium pt-2 border-t border-ink-950/8">
-                        Est. Duration: {selectedService.estimatedDurationMinutes} mins
+                        Priced individually — you'll receive a transparent quote before any work begins.
                       </div>
                     </div>
 

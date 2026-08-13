@@ -19,7 +19,7 @@ const GARAGE_NAME = 'Friends Garage';
 const GARAGE_PHONE = '+353 (0) 91 388 596';
 const GARAGE_MOBILE = '+353 85 869 0104';
 const GARAGE_EMAIL = 'info@friendsgarage.net';
-const GARAGE_ADDRESS = 'Deerpark Industrial Estate, Oranmore, Co. Galway — Eircode H91 H31C';
+const GARAGE_ADDRESS = 'Unit 5, Deerpark Industrial Estate, Carrowmoneash, Oranmore, Co. Galway — Eircode H91 H31C';
 
 interface MailPayload {
   to: string;
@@ -145,7 +145,7 @@ PRODID:-//Friends Garage Oranmore//NONSGML v1.0//EN
 BEGIN:VEVENT
 SUMMARY:Car Service at Friends Garage (${b.serviceName})
 DESCRIPTION:Appointment at Friends Garage for vehicle ${b.vehicleRegistration}. Ref: ${b.referenceNumber}
-LOCATION:Deerpark Industrial Estate, Oranmore, Galway H91 H31C
+LOCATION:Unit 5\, Deerpark Industrial Estate\, Carrowmoneash\, Oranmore\, Co. Galway H91 H31C
 DTSTART:${String(b.bookingDate).replace(/-/g, '')}T${String(b.bookingTime).replace(':', '')}00
 DURATION:PT${b.durationMinutes || 60}M
 END:VEVENT
@@ -260,6 +260,7 @@ export async function emailBookingStatusCustomer(b: any): Promise<void> {
 /* ------------------------- Estimate emails ------------------------ */
 
 export async function emailEstimateReceivedCustomer(e: any): Promise<void> {
+  if (!e.email) return;
   const html = layout(
     'Estimate request received',
     `<p style="font-size:14px;color:#2F333A;line-height:1.6;">Hi ${esc(e.name)},</p>

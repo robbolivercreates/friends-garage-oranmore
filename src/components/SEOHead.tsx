@@ -8,7 +8,7 @@ interface SEOProps {
 
 export const SEOHead: React.FC<SEOProps> = ({
   title = 'Friends Garage | Trusted Car Servicing & Repairs in Oranmore, Galway',
-  description = 'Friends Garage in Deerpark Industrial Estate, Oranmore, Galway provides expert car servicing, brake repairs, diagnostics, tyres, and roadside assistance.',
+  description = 'Friends Garage in Unit 5, Deerpark Industrial Estate, Oranmore, Galway provides expert car servicing, brake repairs, diagnostics, tyres, and roadside assistance.',
   canonicalUrl = 'https://friendsgarage.net'
 }) => {
   useEffect(() => {

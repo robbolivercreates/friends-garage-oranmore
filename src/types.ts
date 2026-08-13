@@ -134,6 +134,8 @@ export interface SiteSettings {
   maxDailyBookings: number;
   heroVideoUrl?: string;
   enableHeroVideo?: boolean;
+  /** Note shown on the roadside page about when emergency dispatch operates. */
+  roadsideHoursNote?: string;
   /** Bring-your-own-key: set via Staff Portal → Site Settings. Never exposed by the public settings endpoint. */
   geminiApiKey?: string;
   geminiModel?: string;

@@ -16,7 +16,7 @@ import {
   emailRoadsideCustomer
 } from './server/mailer.js';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 async function startServer() {
   const app = express();
@@ -288,6 +288,9 @@ async function startServer() {
   });
 
   app.post('/api/estimates', publicWriteLimit, (req, res) => {
+    if (!cleanStr(req.body.name) || !cleanStr(req.body.phone) || !cleanStr(req.body.vehicleRegistration) || !cleanStr(req.body.problemDescription)) {
+      return res.status(400).json({ error: 'Name, phone number, vehicle registration and service description are mandatory.' });
+    }
     const newEstimate = {
       id: `est-${Date.now()}`,
       referenceNumber: generateRef('EST'),

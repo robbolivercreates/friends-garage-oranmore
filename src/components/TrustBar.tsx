@@ -23,7 +23,7 @@ export const TrustBar: React.FC = () => {
     {
       icon: MapPin,
       title: 'Local Galway Garage',
-      desc: 'Deerpark Industrial Estate, Oranmore'
+      desc: 'Unit 5, Deerpark Ind. Est., Oranmore'
     }
   ];
 

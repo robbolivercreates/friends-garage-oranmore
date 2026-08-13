@@ -216,7 +216,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     >
                       {services.map((s) => (
                         <option key={s.id} value={s.id} className="bg-ink-900">
-                          {s.name} ({s.priceType === 'from' ? `From €${s.priceAmount}` : 'Quote'})
+                          {s.name}
                         </option>
                       ))}
                     </select>
@@ -323,10 +323,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                   </p>
 
                   <div className="text-sm text-ink-400 pt-3 border-t border-ink-950/8 flex items-center justify-between">
-                    <span>Est. Time: <span className="font-mono">{service.estimatedDurationMinutes}</span> mins</span>
-                    <span className="font-bold text-ink-950 font-mono">
-                      {service.priceType === 'from' ? `From €${service.priceAmount}` : 'Quote'}
-                    </span>
+                    <span>Transparent pricing after inspection</span>
+                    <span className="font-bold text-brand-500 font-mono">Quote</span>
                   </div>
                 </div>
 

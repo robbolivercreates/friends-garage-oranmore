@@ -116,8 +116,8 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
                           Popular
                         </span>
                       )}
-                      <span className="text-xs font-bold font-mono text-ink-950 bg-paper-dark px-3 py-1 rounded-full">
-                        {service.priceType === 'from' ? `From €${service.priceAmount}` : 'Request Quote'}
+                      <span className="text-xs font-bold font-mono text-brand-500 bg-brand-500/10 border border-brand-500/20 px-3 py-1 rounded-full">
+                        Request Quote
                       </span>
                     </div>
                   </div>
@@ -141,8 +141,8 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-ink-400 pt-3 border-t border-ink-950/8">
-                    <Clock className="w-4 h-4 text-brand-500" />
-                    <span>Est. Duration: {service.estimatedDurationMinutes} mins</span>
+                    <CheckCircle2 className="w-4 h-4 text-brand-500" />
+                    <span>Transparent quote before any work begins</span>
                   </div>
                 </div>
 
@@ -259,19 +259,12 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
                 </div>
               </div>
 
-              {/* Footer: price, duration & CTAs */}
+              {/* Footer: pricing note & CTAs */}
               <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row sm:items-center gap-5 justify-between">
-                <div className="flex items-center gap-8">
-                  <div>
-                    <span className="text-ink-300 block text-xs uppercase tracking-wider">Duration</span>
-                    <span className="font-bold text-white text-base font-mono">{selectedServiceDetail.estimatedDurationMinutes} mins</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-300 block text-xs uppercase tracking-wider">Pricing</span>
-                    <span className="font-bold text-brand-400 text-lg font-mono">
-                      {selectedServiceDetail.priceType === 'from' ? `From €${selectedServiceDetail.priceAmount}` : 'Quote Required'}
-                    </span>
-                  </div>
+                <div>
+                  <span className="text-ink-300 block text-xs uppercase tracking-wider">Pricing</span>
+                  <span className="font-bold text-brand-400 text-lg font-mono">Quote Required</span>
+                  <p className="text-ink-300 text-xs mt-1 max-w-xs">Every job is quoted individually after inspection — no surprises, no hidden charges.</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">

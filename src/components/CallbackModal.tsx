@@ -153,6 +153,9 @@ export const CallbackModal: React.FC<CallbackModalProps> = ({ isOpen, onClose })
                       <option value="Late Afternoon (4pm - 7pm)">Late Afternoon (4:00 PM – 7:00 PM)</option>
                       <option value="As Soon As Possible">As Soon As Possible</option>
                     </select>
+                    <p className="text-xs text-ink-300 leading-relaxed mt-2">
+                      * We will do our very best to return your call during your requested timeline, however this is not always possible due to very high traffic and phone calls.
+                    </p>
                   </div>
 
                   <div>

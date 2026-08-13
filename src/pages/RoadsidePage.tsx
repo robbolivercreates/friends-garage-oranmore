@@ -9,7 +9,8 @@ import {
   AlertTriangle,
   TriangleAlert,
   CarFront,
-  Siren
+  Siren,
+  Clock
 } from 'lucide-react';
 import { SiteSettings } from '../types';
 import { Reveal, staggerParent, staggerChild } from '../components/ui/Reveal';
@@ -165,6 +166,13 @@ export const RoadsidePage: React.FC<RoadsidePageProps> = ({ settings }) => {
                   <p className="text-sm text-ink-300">Fill in your current vehicle location for immediate triage.</p>
                 </div>
               </div>
+
+              {settings.roadsideHoursNote && (
+                <div className="flex items-start gap-3 bg-amber-400/10 border border-amber-400/25 rounded-xl px-4 py-3.5">
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-200 leading-relaxed">{settings.roadsideHoursNote}</p>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

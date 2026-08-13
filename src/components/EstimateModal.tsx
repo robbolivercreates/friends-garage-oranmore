@@ -110,6 +110,7 @@ export const EstimateModal: React.FC<EstimateModalProps> = ({ isOpen, onClose })
                     <div>
                       <h3 className="font-display text-xl font-bold text-white">Request an Estimate</h3>
                       <p className="text-sm text-ink-300 mt-0.5">Receive a detailed repair or service quote from our Oranmore technicians.</p>
+                      <p className="text-xs text-brand-400 mt-1 font-semibold">Fields marked * are mandatory.</p>
                     </div>
                   </div>
                   <button
@@ -148,10 +149,9 @@ export const EstimateModal: React.FC<EstimateModalProps> = ({ isOpen, onClose })
                   </div>
 
                   <div>
-                    <label className="label-dark">Email Address *</label>
+                    <label className="label-dark">Email Address (optional)</label>
                     <input
                       type="email"
-                      required
                       placeholder="e.g. mary@example.ie"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
