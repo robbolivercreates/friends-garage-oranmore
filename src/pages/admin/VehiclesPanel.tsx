@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertTriangle,
+  CheckCircle2,
   ArrowLeft,
   CalendarDays,
   Car,
@@ -317,7 +318,19 @@ const AutoText: React.FC<{
 /* Main panel                                                          */
 /* ------------------------------------------------------------------ */
 
-const VehiclesPanel: React.FC = () => {
+export interface VehicleBookingPrefill {
+  customerName?: string;
+  phone?: string;
+  email?: string;
+  vehicleRegistration?: string;
+}
+
+interface VehiclesPanelProps {
+  /** Hand off to the Bookings tab manual form, prefilled with this vehicle. */
+  onBookVehicle?: (prefill: VehicleBookingPrefill) => void;
+}
+
+const VehiclesPanel: React.FC<VehiclesPanelProps> = ({ onBookVehicle }) => {
   const [view, setView] = useState<View>('browse');
 
   // Top plate search
@@ -411,7 +424,7 @@ const VehiclesPanel: React.FC = () => {
 
   const openFirstVisit = useCallback((plate: string, parsed: ParsedPlate | null) => {
     setFirstVisit({
-      plateInput: parsed?.registration ?? plate,
+      plateInput: plate, // already display-formatted by the server when possible
       displayPlate: plate,
       parsed,
       make: '',
@@ -431,6 +444,14 @@ const VehiclesPanel: React.FC = () => {
     });
     setView('firstVisit');
   }, []);
+
+  // Keep the form's detection banner above the fold when a view switches
+  // (the typed reg stays in the search box so staff keep their context)
+  useEffect(() => {
+    if (view === 'firstVisit' || view === 'profile') {
+      window.scrollTo({ top: 150, behavior: 'smooth' });
+    }
+  }, [view]);
 
   useEffect(() => {
     const norm = normalizeReg(regInput);
@@ -588,7 +609,7 @@ const VehiclesPanel: React.FC = () => {
 
   /* ---------- first-visit save ---------- */
 
-  const saveFirstVisit = async () => {
+  const saveFirstVisit = async (thenBook = false) => {
     if (!firstVisit) return;
     const reg = normalizeReg(firstVisit.plateInput);
     if (!reg) {
@@ -621,7 +642,16 @@ const VehiclesPanel: React.FC = () => {
       }
       activeRegRef.current = reg;
       setRegInput('');
-      await loadProfile(reg);
+      if (thenBook && onBookVehicle) {
+        onBookVehicle({
+          customerName: firstVisit.customerName,
+          phone: firstVisit.customerPhone,
+          email: firstVisit.customerEmail,
+          vehicleRegistration: firstVisit.displayPlate || firstVisit.plateInput
+        });
+      } else {
+        await loadProfile(reg);
+      }
       void loadList(listQuery);
     } catch (e) {
       setFirstVisit((fv) => (fv ? { ...fv, saving: false, error: e instanceof Error ? e.message : 'Save failed — try again.' } : fv));
@@ -820,6 +850,19 @@ const VehiclesPanel: React.FC = () => {
                     {profile.vehicle.county && <Badge>{profile.vehicle.county}</Badge>}
                     <Badge>{FORMAT_LABELS[profile.vehicle.plateFormat ?? ''] ?? 'Unknown format'}</Badge>
                   </div>
+                  {onBookVehicle && (
+                    <button
+                      onClick={() => onBookVehicle({
+                        customerName: profile.vehicle.customerName,
+                        phone: profile.vehicle.customerPhone,
+                        email: profile.vehicle.customerEmail,
+                        vehicleRegistration: profile.vehicle.displayPlate || profile.vehicle.registration
+                      })}
+                      className="btn btn-primary !text-xs"
+                    >
+                      Book this vehicle in →
+                    </button>
+                  )}
                   <div className="ml-auto min-w-[110px] text-right">
                     {saveState === 'saving' && (
                       <span className="text-xs text-ink-300 inline-flex items-center gap-1.5">
@@ -942,6 +985,14 @@ const VehiclesPanel: React.FC = () => {
                             mono
                             onCommit={(customerPhone) => commitPatch({ customerPhone })}
                           />
+                          {profile.vehicle.customerPhone && (
+                            <a
+                              href={`tel:${profile.vehicle.customerPhone.replace(/\s+/g, '')}`}
+                              className="inline-block mt-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                            >
+                              Call customer →
+                            </a>
+                          )}
                         </div>
                         <div className="sm:col-span-2">
                           <FieldLabel>Email</FieldLabel>
@@ -969,7 +1020,22 @@ const VehiclesPanel: React.FC = () => {
                         <CalendarDays className="w-4 h-4 text-brand-400" /> Linked bookings
                       </h3>
                       {profile.bookings.length === 0 ? (
-                        <p className="text-sm text-ink-300">No bookings under this registration yet.</p>
+                        <div className="space-y-3">
+                          <p className="text-sm text-ink-300">No bookings under this registration yet.</p>
+                          {onBookVehicle && (
+                            <button
+                              onClick={() => onBookVehicle({
+                                customerName: profile.vehicle.customerName,
+                                phone: profile.vehicle.customerPhone,
+                                email: profile.vehicle.customerEmail,
+                                vehicleRegistration: profile.vehicle.displayPlate || profile.vehicle.registration
+                              })}
+                              className="btn btn-primary !text-xs"
+                            >
+                              Book this vehicle in →
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                           {profile.bookings.map((b) => (
@@ -1193,7 +1259,9 @@ const VehiclesPanel: React.FC = () => {
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                     : 'bg-sky-500/10 border-sky-500/30 text-sky-300'
                 }`}>
-                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  {firstVisit.parsed.needsReview
+                    ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                    : <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />}
                   <span>
                     {firstVisit.parsed.year && firstVisit.parsed.county
                       ? `${firstVisit.parsed.year}${firstVisit.parsed.half ? ` (${firstVisit.parsed.half === 1 ? 'Jan–Jun' : 'Jul–Dec'})` : ''} · ${firstVisit.parsed.county} — detected from plate`
@@ -1221,7 +1289,7 @@ const VehiclesPanel: React.FC = () => {
                     autoComplete="off"
                     spellCheck={false}
                   />
-                  {firstVisit.displayPlate && normalizeReg(firstVisit.plateInput) !== '' && (
+                  {firstVisit.displayPlate && firstVisit.displayPlate !== firstVisit.plateInput && (
                     <p className="mt-1.5 text-xs font-mono text-ink-300">
                       Display: <span className="text-brand-400">{firstVisit.displayPlate}</span>
                     </p>
@@ -1271,6 +1339,7 @@ const VehiclesPanel: React.FC = () => {
                   <FieldLabel>Year</FieldLabel>
                   <input
                     type="text"
+                    inputMode="numeric"
                     value={firstVisit.year}
                     onChange={(e) => setFirstVisit({ ...firstVisit, year: e.target.value })}
                     placeholder="e.g. 2021"
@@ -1334,7 +1403,8 @@ const VehiclesPanel: React.FC = () => {
                   <div>
                     <FieldLabel>Phone</FieldLabel>
                     <input
-                      type="text"
+                      type="tel"
+                      inputMode="tel"
                       value={firstVisit.customerPhone}
                       onChange={(e) => setFirstVisit({ ...firstVisit, customerPhone: e.target.value })}
                       placeholder="087…"
@@ -1370,15 +1440,29 @@ const VehiclesPanel: React.FC = () => {
                 </p>
               )}
 
-              <button
-                type="button"
-                onClick={() => { void saveFirstVisit(); }}
-                disabled={firstVisit.saving}
-                className="btn btn-primary disabled:opacity-50"
-              >
-                {firstVisit.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                <span>Save &amp; open vehicle</span>
-              </button>
+              <div className="sticky bottom-0 z-10 -mx-5 sm:-mx-6 -mb-5 sm:-mb-6 mt-2 px-5 sm:px-6 py-4 bg-ink-900/95 backdrop-blur-md border-t border-white/10 rounded-b-[1.25rem]">
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { void saveFirstVisit(); }}
+                    disabled={firstVisit.saving}
+                    className="btn btn-primary disabled:opacity-50"
+                  >
+                    {firstVisit.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>Save &amp; open vehicle</span>
+                  </button>
+                  {onBookVehicle && (
+                    <button
+                      type="button"
+                      onClick={() => { void saveFirstVisit(true); }}
+                      disabled={firstVisit.saving}
+                      className="btn btn-outline-light disabled:opacity-50"
+                    >
+                      <span>Save &amp; book in →</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}

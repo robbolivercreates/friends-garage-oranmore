@@ -524,6 +524,7 @@ async function startServer() {
       bookingDate: b.bookingDate,
       bookingTime: b.bookingTime,
       bookingStatus: b.status,
+      displayPlate: formatPlate(b.vehicleRegistration || ''),
       workflowStatus: (b as any).workflowStatus || 'booked_in',
       bay: (b as any).bay || null,
       technician: (b as any).technician || null,

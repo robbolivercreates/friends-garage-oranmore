@@ -181,7 +181,14 @@ export function formatPlate(rawInput: string): string {
       return r.replace(/^([A-Z]{2}\d{2})([A-Z]{3})$/, '$1 $2');
     case 'uk_prefix':
       return r.replace(/^([A-Z]\d{1,3})([A-Z]{3})$/, '$1 $2');
-    default:
+    default: {
+      // Display formatting never depends on county validation — even an
+      // unrecognised plate is easier to read with its natural grouping.
+      const m3 = r.match(/^(\d{3})([A-Z]{1,2})(\d+)$/);
+      if (m3) return r.replace(/^(\d{3})([A-Z]{1,2})(\d+)$/, '$1-$2-$3');
+      const m2 = r.match(/^(\d{2})([A-Z]{1,2})(\d+)$/);
+      if (m2) return r.replace(/^(\d{2})([A-Z]{1,2})(\d+)$/, '$1-$2-$3');
       return r;
+    }
   }
 }

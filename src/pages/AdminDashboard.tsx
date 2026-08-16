@@ -368,11 +368,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   // Header stat figures (derived from the same state — no extra fetching)
   const todayIso = new Date().toISOString().split('T')[0];
+  const dueOrOverdue = bookings.filter(
+    b => b.bookingDate <= todayIso && b.status !== 'cancelled' && b.status !== 'completed'
+  );
+  const overdueCount = dueOrOverdue.filter(b => b.bookingDate < todayIso).length;
   const stats = [
-    { label: 'Total Bookings', value: bookings.length, icon: Calendar },
-    { label: 'Pending Approval', value: bookings.filter(b => b.status === 'pending').length, icon: Clock },
-    { label: "Today's Jobs", value: bookings.filter(b => b.bookingDate === todayIso && b.status !== 'cancelled').length, icon: Wrench },
-    { label: 'Open Estimates', value: estimates.filter(e => e.status !== 'closed').length, icon: FileText }
+    { label: 'Total Bookings', value: bookings.length, icon: Calendar, alert: false },
+    { label: 'Pending Approval', value: bookings.filter(b => b.status === 'pending').length, icon: Clock, alert: false },
+    { label: 'Due / Overdue', value: dueOrOverdue.length, icon: Wrench, alert: overdueCount > 0 },
+    { label: 'Open Estimates', value: estimates.filter(e => e.status !== 'closed').length, icon: FileText, alert: false }
   ];
 
   const tabs: { id: TabId; label: string; count?: number; icon: React.ElementType }[] = [
@@ -388,45 +392,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   ];
 
   return (
-    <div className="relative min-h-screen bg-ink-950 text-ink-200 pt-28 sm:pt-32 md:pt-36 pb-24 overflow-hidden">
+    <div className="relative min-h-screen bg-ink-950 text-ink-200 pt-16 pb-16 overflow-hidden">
       <div className="glow-brand w-[28rem] h-[28rem] -top-40 -right-40" />
 
-      <div className="relative max-w-7xl mx-auto px-4 md:px-8 space-y-10">
+      <div className="relative max-w-[1600px] mx-auto px-4 md:px-6 space-y-6">
 
-        {/* Top Header */}
-        <Reveal inView={false}>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-white/10 pb-8">
-            <div className="space-y-3">
-              <span className="eyebrow">
-                <Lock className="w-3.5 h-3.5" />
-                Staff Portal
-              </span>
-              <h1 className="font-display text-3xl sm:text-4xl lg:text-[2.75rem] font-extrabold leading-[1.08] text-white">
-                Workshop Control Centre
-              </h1>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-300">
-                <span>Deerpark Industrial Estate, Oranmore, Galway</span>
-                <span className="hidden sm:inline text-ink-600">•</span>
-                <span className="inline-flex items-center gap-2 text-ink-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot" />
-                  Signed in — staff session active
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={exportBookingsCSV} className="btn btn-outline-light">
-                <Download className="w-4 h-4 text-brand-400" />
-                <span>Export CSV</span>
-              </button>
-
-              <button onClick={onLogout} className="btn btn-outline-light">
-                <LogOut className="w-4 h-4 text-brand-400" />
-                <span>Logout</span>
-              </button>
-            </div>
+        {/* Compact header — one line, no marketing chrome */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <h1 className="font-display text-xl sm:text-2xl font-extrabold text-white">
+              Workshop Control Centre
+            </h1>
+            <span className="inline-flex items-center gap-2 text-xs text-ink-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot" />
+              Signed in — staff session active
+            </span>
           </div>
-        </Reveal>
+
+          <div className="flex items-center gap-2">
+            <button onClick={exportBookingsCSV} className="btn btn-outline-light !px-3.5 !py-2 !text-xs">
+              <Download className="w-3.5 h-3.5 text-brand-400" />
+              <span>Export CSV</span>
+            </button>
+
+            <button onClick={onLogout} className="btn btn-outline-light !px-3.5 !py-2 !text-xs">
+              <LogOut className="w-3.5 h-3.5 text-brand-400" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
 
         {/* Stat Cards */}
         <motion.div
@@ -438,14 +432,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
-              <motion.div key={stat.label} variants={staggerChild} className="card-dark p-5 sm:p-6 space-y-3">
+              <motion.div
+                key={stat.label}
+                variants={staggerChild}
+                title={stat.alert ? `${stat.value} bookings due today or earlier, including overdue` : undefined}
+                className={`card-dark p-4 space-y-2 ${stat.alert ? '!border-red-400/40' : ''}`}
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-300">
                     {stat.label}
                   </span>
-                  <Icon className="w-4 h-4 text-brand-400" />
+                  <Icon className={`w-4 h-4 ${stat.alert ? 'text-red-400' : 'text-brand-400'}`} />
                 </div>
-                <div className="font-mono text-3xl sm:text-4xl font-bold text-white leading-none">
+                <div className={`font-mono text-2xl sm:text-3xl font-bold leading-none ${stat.alert ? 'text-red-400' : 'text-white'}`}>
                   {stat.value}
                 </div>
               </motion.div>
@@ -453,9 +452,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           })}
         </motion.div>
 
-        {/* Admin Navigation Tabs */}
+        {/* Admin Navigation Tabs — single line, sideways scroll on small screens */}
         <Reveal inView={false} delay={0.1}>
-          <div className="flex flex-wrap gap-x-1 gap-y-2 border-b border-white/10">
+          <div className="flex flex-nowrap overflow-x-auto gap-x-1 border-b border-white/10 sticky top-[52px] z-30 bg-ink-950/95 backdrop-blur-md pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -463,13 +462,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center gap-2 px-4 py-3 text-sm font-bold transition-colors cursor-pointer ${
+                  className={`relative flex items-center gap-2 px-4 py-3 text-sm font-bold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                     isActive ? 'text-white' : 'text-ink-300 hover:text-white'
                   }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-brand-400' : ''}`} />
                   <span>{tab.label}</span>
-                  {typeof tab.count === 'number' && (
+                  {typeof tab.count === 'number' && tab.count > 0 && (
                     <span
                       className={`font-mono text-[11px] px-1.5 py-0.5 rounded-md ${
                         isActive ? 'bg-brand-500/15 text-brand-400' : 'bg-white/5 text-ink-300'
@@ -493,10 +492,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
         {/* TAB 1: BOOKINGS MANAGER */}
         {/* TAB 0: WORKSHOP KANBAN */}
-        {activeTab === 'workshop' && <WorkshopBoard />}
+        {activeTab === 'workshop' && (
+          <WorkshopBoard
+            onOpenBooking={(ref) => {
+              setSearchQuery(ref);
+              setActiveTab('bookings');
+            }}
+            onAddWalkIn={() => {
+              setSearchQuery('');
+              setShowManualForm(true);
+              setActiveTab('bookings');
+              setTimeout(() => window.scrollTo({ top: 400, behavior: 'smooth' }), 150);
+            }}
+          />
+        )}
 
         {/* TAB 0.5: VEHICLE DATABASE */}
-        {activeTab === 'vehicles' && <VehiclesPanel />}
+        {activeTab === 'vehicles' && (
+          <VehiclesPanel
+            onBookVehicle={(prefill) => {
+              setSearchQuery('');
+              setManual({
+                customerName: prefill.customerName || '',
+                phone: prefill.phone || '',
+                email: prefill.email || '',
+                vehicleRegistration: prefill.vehicleRegistration || '',
+                serviceName: '',
+                bookingDate: '',
+                bookingTime: '09:30',
+                customerNotes: ''
+              });
+              setShowManualForm(true);
+              setActiveTab('bookings');
+              setTimeout(() => window.scrollTo({ top: 400, behavior: 'smooth' }), 150);
+            }}
+          />
+        )}
 
         {/* TAB 1: BOOKINGS MANAGER */}
         {activeTab === 'bookings' && (

@@ -118,14 +118,42 @@ export default function App() {
         }
       />
 
-      {/* Global Navbar */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onOpenBooking={handleOpenBooking}
-        onOpenEstimate={() => setIsEstimateOpen(true)}
-        onOpenCallback={() => setIsCallbackOpen(true)}
-      />
+      {/* Global Navbar (hidden in the staff portal — app chrome, not marketing) */}
+      {activeTab !== 'admin' && (
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenBooking={handleOpenBooking}
+          onOpenEstimate={() => setIsEstimateOpen(true)}
+          onOpenCallback={() => setIsCallbackOpen(true)}
+        />
+      )}
+
+      {/* Slim staff chrome when in the portal */}
+      {activeTab === 'admin' && (
+        <header className="fixed top-0 inset-x-0 z-50 bg-ink-950/95 backdrop-blur-md border-b border-white/10">
+          <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-2.5 flex items-center justify-between">
+            <button
+              onClick={() => { setActiveTab('home'); window.scrollTo(0, 0); }}
+              className="flex items-center gap-2.5 group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center text-white">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M22.7 6.3a1 1 0 0 0-1.4 0L19 8.6l-2.3-.7-.7-2.3a1 1 0 0 0-1.3-.6 6.5 6.5 0 0 0-8 8L3 16.7A2.1 2.1 0 1 0 6 19.7l3.7-3.7a6.5 6.5 0 0 0 8-8 1 1 0 0 0-.6-1.3L15 7.4l2.3-2.3a1 1 0 0 0 0-1.4z" transform="scale(0.9)"/></svg>
+              </div>
+              <span className="font-display font-bold text-white text-sm tracking-tight">
+                FRIENDS<span className="text-brand-500">.</span>GARAGE
+                <span className="text-ink-300 font-semibold text-xs ml-2 uppercase tracking-widest">Staff Portal</span>
+              </span>
+            </button>
+            <button
+              onClick={() => { setActiveTab('home'); window.scrollTo(0, 0); }}
+              className="text-xs font-semibold text-ink-300 hover:text-white border border-white/15 hover:border-white/30 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              ← View public site
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* Main Content Router */}
       <main className="flex-grow">
@@ -221,27 +249,31 @@ export default function App() {
         )}
       </main>
 
-      {/* Global Footer */}
-      <Footer
-        settings={settings}
-        setActiveTab={setActiveTab}
-        onOpenAdminLogin={() => {
-          if (isAdminAuthenticated) {
-            setActiveTab('admin');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else {
-            setIsAdminLoginOpen(true);
-          }
-        }}
-        onOpenBooking={handleOpenBooking}
-      />
+      {/* Global Footer (hidden in the staff portal) */}
+      {activeTab !== 'admin' && (
+        <Footer
+          settings={settings}
+          setActiveTab={setActiveTab}
+          onOpenAdminLogin={() => {
+            if (isAdminAuthenticated) {
+              setActiveTab('admin');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              setIsAdminLoginOpen(true);
+            }
+          }}
+          onOpenBooking={handleOpenBooking}
+        />
+      )}
 
-      {/* Sticky Mobile Quick Action Bar */}
-      <StickyMobileCTA
-        onOpenBooking={() => handleOpenBooking()}
-        onOpenRoadside={() => { setActiveTab('roadside'); window.scrollTo(0,0); }}
-        phone={settings.phone}
-      />
+      {/* Sticky Mobile Quick Action Bar (hidden in the staff portal) */}
+      {activeTab !== 'admin' && (
+        <StickyMobileCTA
+          onOpenBooking={() => handleOpenBooking()}
+          onOpenRoadside={() => { setActiveTab('roadside'); window.scrollTo(0,0); }}
+          phone={settings.phone}
+        />
+      )}
 
       {/* GDPR Consent Banner */}
       <CookieBanner />
