@@ -136,6 +136,21 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
   const dayMs = 86400000;
   const fmtDate = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' });
+  /** Normalise Irish phone display to one local format staff actually dial. */
+  const fmtPhone = (raw: string): string => {
+    const d = (raw || '').replace(/\D/g, '');
+    if (d.startsWith('353') && d.length >= 11) return fmtPhone('0' + d.slice(3));
+    if (d.startsWith('0') && d.length >= 9) return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`.trim();
+    return raw;
+  };
+  /** "2 min ago" style — faster to read on a wall-mounted screen. */
+  const fmtAgo = (date: Date) => {
+    const mins = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+    if (mins < 1) return 'just now';
+    if (mins === 1) return '1 min ago';
+    if (mins < 60) return `${mins} min ago`;
+    return date.toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' });
+  };
   const daysOnBoard = (card: WorkshopCard) =>
     Math.max(0, Math.floor((Date.parse(todayStr) - Date.parse(card.bookingDate)) / dayMs));
   /** Aging cue: overdue in Booked In, or >3 days sitting in any non-terminal column. */
@@ -153,8 +168,8 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
         <div>
           <h2 className="font-display text-xl font-bold text-white">Workshop Floor</h2>
           <p className="text-sm text-ink-300">
-            {cards.length} active on the floor
-            {lastSync && <> · synced {lastSync.toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' })}</>}
+            {cards.length} {cards.length === 1 ? 'booking' : 'bookings'} on the board
+            {lastSync && <> · synced {fmtAgo(lastSync)}</>}
           </p>
         </div>
         <button onClick={() => load()} className="btn btn-outline-light !px-4 !py-2 !text-xs">
@@ -240,7 +255,7 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
                       </button>
                       {age === 'overdue' && (
                         <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-red-300 bg-red-400/10 border border-red-400/30 px-2 py-0.5 rounded-full">
-                          Overdue
+                          {daysOnBoard(card) > 0 ? `${daysOnBoard(card)} days overdue` : 'Overdue'}
                         </span>
                       )}
                       {age === 'aging' && (
@@ -255,7 +270,7 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
                         className={`space-y-0.5 ${onOpenBooking ? 'cursor-pointer' : ''}`}
                         title={onOpenBooking ? `Open booking ${card.referenceNumber}` : undefined}
                       >
-                        <div className="text-sm font-bold text-white">{card.customerName}</div>
+                        <div className="text-sm font-bold text-white">{(card.customerName || '').trim() || 'Customer'}</div>
                         {card.phone && (
                           <a
                             href={`tel:${card.phone.replace(/\s+/g, '')}`}
@@ -263,11 +278,11 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
                             className="font-mono text-xs text-emerald-400 hover:text-emerald-300 block w-fit transition-colors"
                             title={`Call ${card.customerName}`}
                           >
-                            {card.phone}
+                            {fmtPhone(card.phone)}
                           </a>
                         )}
                         <div className="font-mono text-[10px] text-ink-300">{card.referenceNumber}</div>
-                        <div className="text-xs text-brand-400 font-semibold">{card.serviceName}</div>
+                        <div className="text-xs text-ink-200 font-semibold">{card.serviceName}</div>
                         {card.vehicle && <div className="text-xs text-ink-300">{card.vehicle}</div>}
                         <div className="text-xs text-ink-300 flex items-center gap-1">
                           <Clock className="w-3 h-3" /> {fmtDate(card.bookingDate)} · {card.bookingTime}

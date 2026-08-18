@@ -372,11 +372,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     b => b.bookingDate <= todayIso && b.status !== 'cancelled' && b.status !== 'completed'
   );
   const overdueCount = dueOrOverdue.filter(b => b.bookingDate < todayIso).length;
-  const stats = [
-    { label: 'Total Bookings', value: bookings.length, icon: Calendar, alert: false },
-    { label: 'Pending Approval', value: bookings.filter(b => b.status === 'pending').length, icon: Clock, alert: false },
-    { label: 'Due / Overdue', value: dueOrOverdue.length, icon: Wrench, alert: overdueCount > 0 },
-    { label: 'Open Estimates', value: estimates.filter(e => e.status !== 'closed').length, icon: FileText, alert: false }
+  const stats: { label: string; value: number; icon: React.ElementType; alert: boolean; onClick: () => void }[] = [
+    { label: 'Total Bookings', value: bookings.length, icon: Calendar, alert: false, onClick: () => { setStatusFilter('all'); setSearchQuery(''); setActiveTab('bookings'); } },
+    { label: 'Pending Approval', value: bookings.filter(b => b.status === 'pending').length, icon: Clock, alert: false, onClick: () => { setStatusFilter('pending'); setSearchQuery(''); setActiveTab('bookings'); } },
+    { label: 'Due / Overdue', value: dueOrOverdue.length, icon: Wrench, alert: overdueCount > 0, onClick: () => { setStatusFilter('all'); setSearchQuery(''); setActiveTab('bookings'); } },
+    { label: 'Open Estimates', value: estimates.filter(e => e.status !== 'closed').length, icon: FileText, alert: false, onClick: () => setActiveTab('estimates') }
   ];
 
   const tabs: { id: TabId; label: string; count?: number; icon: React.ElementType }[] = [
@@ -432,11 +432,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
-              <motion.div
+              <motion.button
                 key={stat.label}
                 variants={staggerChild}
-                title={stat.alert ? `${stat.value} bookings due today or earlier, including overdue` : undefined}
-                className={`card-dark p-4 space-y-2 ${stat.alert ? '!border-red-400/40' : ''}`}
+                onClick={stat.onClick}
+                title={stat.alert ? `${stat.value} bookings due today or earlier, including overdue — click to view` : `View ${stat.label.toLowerCase()}`}
+                className={`card-dark p-4 space-y-2 text-left cursor-pointer hover:-translate-y-0.5 transition-transform ${stat.alert ? '!border-red-400/40' : ''}`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-300">
@@ -447,7 +448,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 <div className={`font-mono text-2xl sm:text-3xl font-bold leading-none ${stat.alert ? 'text-red-400' : 'text-white'}`}>
                   {stat.value}
                 </div>
-              </motion.div>
+              </motion.button>
             );
           })}
         </motion.div>
