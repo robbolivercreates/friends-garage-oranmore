@@ -51,17 +51,27 @@ the API with curl and/or the UI (Playwright works well — headless Chromium).
 server.ts                 Express app: all REST endpoints, Vite/static middleware
 server/db.ts              SQLite data layer (the ONLY db access point)
 server/mailer.ts          Email templates + SMTP/outbox delivery
-src/App.tsx               Tab router, global state, modal mounting
+server/assistant.ts       Staff AI assistant (Gemini function calling, BYOK)
+server/plates.ts          Irish+UK plate parser (pure functions, unit-tested)
+server/vehicleProviders.ts Plate-lookup provider abstraction (NoOp default)
+src/App.tsx               Tab router + global state + modals; chrome split
+                          (marketing nav/footer hidden in the staff portal)
 src/types.ts              Shared TS interfaces (Booking, ServiceItem, ...)
 src/data/initialData.ts   Seed content: 11 services, 5 team members, reviews, settings
+src/data/carData.ts       24 Irish-market makes → models → engines
 src/config/assets.ts      IMAGES registry → /images/garage/*
 src/index.css             Tailwind v4 @theme tokens + shared utilities/animations
 src/components/           Navbar, Footer, TrustBar, StickyMobileCTA, modals, SEOHead
 src/components/ui/        Reveal (scroll anim), SectionHeader, ServiceIcon — shared primitives
 src/pages/                One file per tab; AdminDashboard.tsx is the staff portal
+src/pages/admin/          api.ts (authed fetch), format.ts (fmtPhone/fmtDate),
+                          WorkshopBoard.tsx (kanban), VehiclesPanel.tsx (vehicle DB)
+tests/                    node:test gate (36 tests): plates units + API + vehicles
 public/images/            All photography (see public/images/README.md)
 public/videos/            Optional hero.mp4 (see public/videos/README.md)
+public/progress.html      Live build-progress page
 data/                     Runtime data (gitignored): friendsgarage.db, outbox.json
+AUDIT.md                  Feature audit baseline (pre-elevation map)
 DESIGN_SYSTEM.md          Visual language contract — REQUIRED reading for UI work
 GUIA-DE-ATIVACAO.md       Client-facing activation guide (Portuguese)
 ```
@@ -140,6 +150,22 @@ Reference numbers: `FG-2026-XXXX` bookings, `EST-`, `EMG-` (see
   env) only after cookie consent; the CookieBanner dispatches
   `fg-consent-changed` on save. Meta Pixel goes inside the GTM container —
   no code changes.
+
+## Elevation (Aug 2026) — workshop management layer
+
+- **Kanban** (`WorkshopBoard`): 6 workflow columns (booked_in → diagnosing →
+  waiting_parts → in_progress → quality_check → ready), arrow moves + jump
+  menu, bay/technician inline assignment, overdue/aging/due-today chips,
+  collect with confirm + undo toast, auto-refresh 30s. Data: bookings carry
+  `workflowStatus`/`bay`/`technician` via PATCH merge; `GET /api/workshop`.
+- **Vehicle database** (`VehiclesPanel`): instant plate search, first-visit
+  entry with live parse autofill + make→model→engine dropdowns (carData.ts),
+  profile with editable details, service history (parts/notes/technician),
+  linked bookings, "Book this vehicle in" handoff. Auto-builds from bookings.
+- **Plates**: `server/plates.ts` — Irish 2013+ / 1987-2012 / pre-87 + UK
+  current/prefix; formatPlate pattern-formats even unknown plates.
+- **Critic process**: 21 fresh-context review rounds vs Shopmonkey/Tekmetric/
+  Trello standards; rounds 20-21 = two consecutive PASS verdicts.
 
 ## Current delivery state
 

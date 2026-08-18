@@ -161,7 +161,7 @@ async function startServer() {
 
   // Get Bookings (staff only — contains customer PII)
   app.get('/api/bookings', requireAdmin, (req, res) => {
-    res.json(db.getBookings());
+    res.json(db.getBookings().map(b => ({ ...b, displayPlate: formatPlate(b.vehicleRegistration || '') })));
   });
 
   // Create Booking (public, rate-limited + validated)

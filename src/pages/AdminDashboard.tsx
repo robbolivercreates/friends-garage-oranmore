@@ -89,6 +89,7 @@ const TIME_SLOTS = [
 const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'rescheduled', 'cancelled'];
 
 import { api } from './admin/api';
+import { fmtPhone } from './admin/format';
 import WorkshopBoard from './admin/WorkshopBoard';
 import VehiclesPanel from './admin/VehiclesPanel';
 
@@ -362,7 +363,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       b.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.phone.includes(searchQuery);
 
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all' ||
+      b.status === statusFilter ||
+      (statusFilter === 'due' &&
+        b.bookingDate <= new Date().toISOString().split('T')[0] &&
+        b.status !== 'cancelled' &&
+        b.status !== 'completed');
     return matchesSearch && matchesStatus;
   });
 
@@ -375,7 +382,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const stats: { label: string; value: number; icon: React.ElementType; alert: boolean; onClick: () => void }[] = [
     { label: 'Total Bookings', value: bookings.length, icon: Calendar, alert: false, onClick: () => { setStatusFilter('all'); setSearchQuery(''); setActiveTab('bookings'); } },
     { label: 'Pending Approval', value: bookings.filter(b => b.status === 'pending').length, icon: Clock, alert: false, onClick: () => { setStatusFilter('pending'); setSearchQuery(''); setActiveTab('bookings'); } },
-    { label: 'Due / Overdue', value: dueOrOverdue.length, icon: Wrench, alert: overdueCount > 0, onClick: () => { setStatusFilter('all'); setSearchQuery(''); setActiveTab('bookings'); } },
+    { label: 'Due / Overdue', value: dueOrOverdue.length, icon: Wrench, alert: overdueCount > 0, onClick: () => { setStatusFilter('due'); setSearchQuery(''); setActiveTab('bookings'); } },
     { label: 'Open Estimates', value: estimates.filter(e => e.status !== 'closed').length, icon: FileText, alert: false, onClick: () => setActiveTab('estimates') }
   ];
 
@@ -553,6 +560,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   className="input-dark cursor-pointer"
                 >
                   <option value="all">All Statuses</option>
+                  <option value="due">Due / Overdue</option>
                   <option value="pending">Pending</option>
                   <option value="confirmed">Confirmed</option>
                   <option value="completed">Completed</option>
@@ -600,6 +608,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </div>
 
             {/* Bookings Table */}
+            {statusFilter === 'due' && (
+              <p className="text-xs font-bold text-red-400 px-1">
+                {filteredBookings.length} due / overdue {filteredBookings.length === 1 ? 'booking' : 'bookings'}
+              </p>
+            )}
             <div className="card-dark overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -626,6 +639,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                           <td className="p-4 sm:p-5 space-y-2 align-top">
                             <span className="font-mono font-bold text-white block">{b.referenceNumber}</span>
                             <StatusPill status={b.status} />
+                            {b.bookingDate < todayIso && b.status !== 'completed' && b.status !== 'cancelled' && (
+                              <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-red-300 bg-red-400/10 border border-red-400/30 px-2 py-0.5 rounded-full">
+                                {Math.floor((Date.parse(todayIso) - Date.parse(b.bookingDate)) / 86400000)} days overdue
+                              </span>
+                            )}
+                            {b.bookingDate === todayIso && b.status !== 'completed' && b.status !== 'cancelled' && (
+                              <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-400/10 border border-emerald-400/30 px-2 py-0.5 rounded-full">
+                                Due today
+                              </span>
+                            )}
                           </td>
 
                           <td className="p-4 sm:p-5 align-top">
@@ -661,7 +684,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                               </div>
                             ) : (
                               <>
-                                <span className="font-bold text-white block">{b.bookingDate}</span>
+                                <span className="font-bold text-white block">
+                                  {new Date(`${b.bookingDate}T00:00:00`).toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
                                 <span className="text-ink-300">{b.bookingTime} ({b.durationMinutes}m)</span>
                                 <button
                                   onClick={() => setRescheduleEditing({ id: b.id, date: b.bookingDate, time: b.bookingTime })}
@@ -675,9 +700,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
                           <td className="p-4 sm:p-5 space-y-1 align-top">
                             <span className="font-bold text-white block">{b.customerName}</span>
-                            <span className="text-brand-400 font-mono font-bold block">{b.vehicleRegistration}</span>
+                            <span className="text-white font-mono font-bold block">{(b as any).displayPlate || b.vehicleRegistration}</span>
                             <span className="text-ink-300 text-xs block">{b.vehicleMake} {b.vehicleModel}</span>
-                            <span className="text-ink-300 text-xs block">{b.phone}</span>
+                            <span className="text-ink-300 text-xs block font-mono">{fmtPhone(b.phone)}</span>
                           </td>
 
                           <td className="p-4 sm:p-5 align-top">
@@ -752,7 +777,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     ) : (
                       <tr>
                         <td colSpan={6} className="p-10 text-center text-ink-300">
-                          No bookings found matching filters.
+                          <div className="space-y-3">
+                            <p>No bookings found matching filters.</p>
+                            <button
+                              onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
+                              className="text-xs font-bold text-brand-400 hover:text-brand-500 underline underline-offset-2 transition-colors"
+                            >
+                              Clear search &amp; filters
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )}

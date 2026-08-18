@@ -8,6 +8,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { api } from './api';
+import { fmtPhone } from './format';
 
 interface WorkshopCard {
   id: string;
@@ -63,6 +64,7 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
   const [confirmCollectId, setConfirmCollectId] = useState<string | null>(null);
   const [undoCard, setUndoCard] = useState<WorkshopCard | null>(null);
   const [focusBayId, setFocusBayId] = useState<string | null>(null);
+  const [jumpMenuId, setJumpMenuId] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -136,13 +138,6 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
   const dayMs = 86400000;
   const fmtDate = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' });
-  /** Normalise Irish phone display to one local format staff actually dial. */
-  const fmtPhone = (raw: string): string => {
-    const d = (raw || '').replace(/\D/g, '');
-    if (d.startsWith('353') && d.length >= 11) return fmtPhone('0' + d.slice(3));
-    if (d.startsWith('0') && d.length >= 9) return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`.trim();
-    return raw;
-  };
   /** "2 min ago" style — faster to read on a wall-mounted screen. */
   const fmtAgo = (date: Date) => {
     const mins = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
@@ -153,10 +148,12 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
   };
   const daysOnBoard = (card: WorkshopCard) =>
     Math.max(0, Math.floor((Date.parse(todayStr) - Date.parse(card.bookingDate)) / dayMs));
-  /** Aging cue: overdue in Booked In, or >3 days sitting in any non-terminal column. */
-  const aging = (card: WorkshopCard): 'overdue' | 'aging' | null => {
+  /** Aging cue: overdue in Booked In, due today, >3 days in any stage, uncollected in Ready. */
+  const aging = (card: WorkshopCard): 'overdue' | 'due_today' | 'aging' | 'awaiting' | null => {
     if (card.bookingStatus === 'completed' || card.bookingStatus === 'cancelled') return null;
     if (card.workflowStatus === 'booked_in' && card.bookingDate < todayStr) return 'overdue';
+    if (card.workflowStatus === 'booked_in' && card.bookingDate === todayStr) return 'due_today';
+    if (card.workflowStatus === 'ready' && daysOnBoard(card) > 3) return 'awaiting';
     if (card.workflowStatus !== 'ready' && daysOnBoard(card) > 3) return 'aging';
     return null;
   };
@@ -168,7 +165,7 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
         <div>
           <h2 className="font-display text-xl font-bold text-white">Workshop Floor</h2>
           <p className="text-sm text-ink-300">
-            {cards.length} {cards.length === 1 ? 'booking' : 'bookings'} on the board
+            {cards.length} active {cards.length === 1 ? 'booking' : 'bookings'} on the board
             {lastSync && <> · synced {fmtAgo(lastSync)}</>}
           </p>
         </div>
@@ -224,7 +221,7 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
             const showGuidance = colCards.length === 0 && col.id !== 'booked_in' && colIndex(col.id) === furthestIdx + 1;
             return (
               <div key={col.id} className="space-y-3">
-                <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold uppercase tracking-wider whitespace-nowrap ${col.accent}`}>
+                <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold uppercase tracking-wider whitespace-nowrap sticky top-[118px] z-10 bg-ink-950/95 backdrop-blur-sm ${col.accent}`}>
                   <span className="flex items-center gap-2 min-w-0 truncate">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} />
                     {col.label}
@@ -243,7 +240,15 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                      className={`card-dark p-4 space-y-3 ${age ? '!border-red-400/50' : ''}`}
+                      className={`card-dark p-4 space-y-3 ${
+                        age === 'overdue'
+                          ? '!border-red-400/50'
+                          : age === 'aging' || age === 'awaiting'
+                          ? '!border-amber-400/50'
+                          : age === 'due_today'
+                          ? '!border-emerald-400/40'
+                          : ''
+                      }`}
                     >
                       {/* Plate first — full-width, hard no-wrap, click-through to the booking */}
                       <button
@@ -258,9 +263,19 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
                           {daysOnBoard(card) > 0 ? `${daysOnBoard(card)} days overdue` : 'Overdue'}
                         </span>
                       )}
+                      {age === 'due_today' && (
+                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-400/10 border border-emerald-400/30 px-2 py-0.5 rounded-full">
+                          Arriving today
+                        </span>
+                      )}
                       {age === 'aging' && (
                         <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
                           {daysOnBoard(card)} days on board
+                        </span>
+                      )}
+                      {age === 'awaiting' && (
+                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                          {daysOnBoard(card)} days awaiting collection
                         </span>
                       )}
 
@@ -275,7 +290,7 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
                           <a
                             href={`tel:${card.phone.replace(/\s+/g, '')}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="font-mono text-xs text-emerald-400 hover:text-emerald-300 block w-fit transition-colors"
+                            className="font-mono text-xs text-sky-400 hover:text-sky-300 block w-fit transition-colors"
                             title={`Call ${card.customerName}`}
                           >
                             {fmtPhone(card.phone)}
@@ -319,14 +334,17 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
 
                       {/* Move controls */}
                       <div className="flex items-center justify-between pt-1 border-t border-white/10">
-                        <button
-                          onClick={() => move(card, -1)}
-                          disabled={colIndex(card.workflowStatus) === 0}
-                          aria-label="Move back one stage"
-                          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold text-ink-300 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:pointer-events-none transition-colors"
-                        >
-                          <ChevronLeft className="w-4 h-4" /> Back
-                        </button>
+                        {colIndex(card.workflowStatus) > 0 ? (
+                          <button
+                            onClick={() => move(card, -1)}
+                            aria-label="Move back one stage"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold text-ink-300 hover:text-white hover:bg-white/10 transition-colors"
+                          >
+                            <ChevronLeft className="w-4 h-4" /> Back
+                          </button>
+                        ) : (
+                          <span />
+                        )}
 
                         {card.workflowStatus === 'ready' ? (
                           confirmCollectId === card.id ? (
@@ -356,14 +374,43 @@ export const WorkshopBoard: React.FC<WorkshopBoardProps> = ({ onOpenBooking, onA
                           <span />
                         )}
 
-                        <button
-                          onClick={() => move(card, 1)}
-                          disabled={colIndex(card.workflowStatus) === COLUMNS.length - 1}
-                          aria-label={`Move to ${COLUMNS[colIndex(card.workflowStatus) + 1]?.label ?? 'next stage'}`}
-                          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold text-ink-300 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:pointer-events-none transition-colors"
-                        >
-                          Next: {COLUMNS[colIndex(card.workflowStatus) + 1]?.short} <ChevronRight className="w-4 h-4" />
-                        </button>
+                        <div className="relative flex items-center">
+                          <button
+                            onClick={() => move(card, 1)}
+                            disabled={colIndex(card.workflowStatus) === COLUMNS.length - 1}
+                            aria-label={`Move to ${COLUMNS[colIndex(card.workflowStatus) + 1]?.label ?? 'next stage'}`}
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold text-ink-300 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                          >
+                            Next: {COLUMNS[colIndex(card.workflowStatus) + 1]?.short} <ChevronRight className="w-4 h-4" />
+                          </button>
+                          {colIndex(card.workflowStatus) < COLUMNS.length - 2 && (
+                            <button
+                              onClick={() => setJumpMenuId(jumpMenuId === card.id ? null : card.id)}
+                              aria-label="Jump to a later stage"
+                              title="Jump to a later stage"
+                              className="px-1.5 py-1.5 rounded-lg text-[11px] font-bold text-ink-400 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                              ⋯
+                            </button>
+                          )}
+                          {jumpMenuId === card.id && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setJumpMenuId(null)} />
+                              <div className="absolute left-0 bottom-full mb-1 z-20 card-dark !rounded-xl p-1.5 min-w-[150px] shadow-2xl">
+                              {COLUMNS.slice(colIndex(card.workflowStatus) + 2).map((c) => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => { patchCard(card.id, { workflowStatus: c.id }); setJumpMenuId(null); }}
+                                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-ink-200 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                                >
+                                  <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                                  Jump to {c.label}
+                                </button>
+                              ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                     );
